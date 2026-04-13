@@ -20,11 +20,12 @@ final class PhotoLibraryManager: NSObject {
         return status
     }
 
-    func fetchAllPhotos() async -> [PHAsset] {
+    /// Fetches photos sorted by creation date descending. limit=0 means no limit.
+    func fetchAllPhotos(limit: Int = 0) async -> [PHAsset] {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
-        options.fetchLimit = 0
+        options.fetchLimit = limit > 0 ? limit : 0
 
         let result = PHAsset.fetchAssets(with: .image, options: options)
         var assets: [PHAsset] = []

@@ -5,6 +5,8 @@ struct PermissionView: View {
     @Environment(AppState.self) private var appState
     @Environment(PhotoLibraryManager.self) private var libraryManager
 
+    @AppStorage("batchSize") private var batchSize: Int = 100
+
     @State private var isDenied = false
     @State private var isLoading = false
 
@@ -72,11 +74,11 @@ struct PermissionView: View {
         let status = await libraryManager.requestAuthorization()
         switch status {
         case .authorized, .limited:
-            appState.screen = .loading
-            let assets = await libraryManager.fetchAllPhotos()
+            let limit = batchSize > 0 ? batchSize : 100
+            let assets = await libraryManager.fetchAllPhotos(limit: limit)
             appState.pendingPhotos = assets.map { PhotoItem(asset: $0) }
             appState.sessionStartTime = Date()
-            appState.screen = .swiping
+            appState.isPermissionGranted = true
         case .denied, .restricted:
             isDenied = true
             isLoading = false

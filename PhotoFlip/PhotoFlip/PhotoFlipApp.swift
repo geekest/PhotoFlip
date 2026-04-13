@@ -1,22 +1,25 @@
-//
-//  PhotoFlipApp.swift
-//  PhotoFlip
-//
-//  Created by Local on 2026/4/13.
-//
-
 import SwiftUI
+import Photos
 
 @main
 struct PhotoFlipApp: App {
     @State private var appState = AppState()
     @State private var libraryManager = PhotoLibraryManager()
+    @AppStorage("batchSize") private var batchSize: Int = 100
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(appState)
                 .environment(libraryManager)
+                .task {
+                    // For returning users who already granted permission, auto-load a batch.
+                    guard appState.isPermissionGranted, appState.pendingPhotos.isEmpty else { return }
+                    let limit = batchSize > 0 ? batchSize : 100
+                    let assets = await libraryManager.fetchAllPhotos(limit: limit)
+                    appState.pendingPhotos = assets.map { PhotoItem(asset: $0) }
+                    appState.sessionStartTime = Date()
+                }
         }
     }
 }

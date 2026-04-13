@@ -14,17 +14,36 @@ final class SwipeSessionViewModel {
     private var undoStack: [UndoRecord] = []
     private let maxUndoDepth = 10
 
-    private let appState: AppState
+    private let libraryManager: PhotoLibraryManager
 
     var canUndo: Bool { !undoStack.isEmpty }
-    var progress: Double {
-        guard !photos.isEmpty else { return 0 }
-        return Double(currentIndex) / Double(photos.count)
+
+    /// True once every photo in the batch has been decided.
+    var isComplete: Bool { !photos.isEmpty && currentIndex >= photos.count }
+
+    // Counts apply only to already-decided photos (index < currentIndex).
+    var deletedCount: Int {
+        photos[0..<min(currentIndex, photos.count)].filter { $0.decision == .delete }.count
+    }
+    var keptCount: Int {
+        photos[0..<min(currentIndex, photos.count)].filter {
+            $0.decision == .keep || $0.decision == .favorite
+        }.count
+    }
+    var favoritedCount: Int {
+        photos[0..<min(currentIndex, photos.count)].filter { $0.decision == .favorite }.count
     }
 
-    init(photos: [PhotoItem], appState: AppState) {
+    /// Photos marked for deletion that haven't been actually deleted from the library yet.
+    var photosToDelete: [PhotoItem] {
+        Array(photos[0..<min(currentIndex, photos.count)].filter {
+            $0.decision == .delete && !$0.wasDeletedFromLibrary
+        })
+    }
+
+    init(photos: [PhotoItem], libraryManager: PhotoLibraryManager) {
         self.photos = photos
-        self.appState = appState
+        self.libraryManager = libraryManager
     }
 
     func processDecision(_ decision: SwipeDecision) {
@@ -32,9 +51,7 @@ final class SwipeSessionViewModel {
 
         let record = UndoRecord(index: currentIndex, previous: photos[currentIndex].decision)
         undoStack.append(record)
-        if undoStack.count > maxUndoDepth {
-            undoStack.removeFirst()
-        }
+        if undoStack.count > maxUndoDepth { undoStack.removeFirst() }
 
         photos[currentIndex].decision = decision
 
@@ -50,12 +67,14 @@ final class SwipeSessionViewModel {
         }
 
         currentIndex += 1
+    }
 
-        if currentIndex >= photos.count {
-            // Sync decided photos back to AppState before navigating to review
-            appState.pendingPhotos = photos
-            appState.screen = .review
-        }
+    /// Tapping the heart: write to iOS Favorites immediately, then advance the card.
+    func markFavorite(for photoItem: PhotoItem) {
+        guard currentIndex < photos.count,
+              photos[currentIndex].id == photoItem.id else { return }
+        Task { try? await libraryManager.setFavorite(asset: photoItem.asset, favorite: true) }
+        processDecision(.favorite)
     }
 
     func undo() {
@@ -63,5 +82,13 @@ final class SwipeSessionViewModel {
         photos[record.index].decision = record.previous
         currentIndex = record.index
         HapticManager.shared.impact(.light)
+    }
+
+    /// After a successful PHPhotoLibrary delete, mark those photos so they don't appear
+    /// in photosToDelete again.
+    func markActuallyDeleted(ids: Set<String>) {
+        for i in 0..<photos.count where ids.contains(photos[i].id) {
+            photos[i].wasDeletedFromLibrary = true
+        }
     }
 }

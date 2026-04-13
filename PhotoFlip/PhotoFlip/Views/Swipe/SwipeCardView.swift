@@ -7,27 +7,41 @@ struct SwipeCardView: View {
     let loader: ImageLoader
 
     @State private var flyOffDirection: SwipeDecision?
+    @State private var showDetail = false
 
     private let screenWidth = UIScreen.main.bounds.width
     private let dragThresholdX: CGFloat = 100
-    private let dragThresholdY: CGFloat = -80
 
     var body: some View {
         ZStack {
+            // Background shown while image loads
+            Color(UIColor.secondarySystemBackground)
+
             if let image = loader.image {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
+                    .allowsHitTesting(false)
             } else {
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.2))
-                    .overlay(ProgressView())
+                ProgressView()
             }
 
             if isTopCard {
                 DecisionOverlay(dragOffset: viewModel.dragOffset)
+
+                // Heart / favorite button – bottom-right corner
+                Button {
+                    viewModel.markFavorite(for: photoItem)
+                } label: {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(.red)
+                        .shadow(color: .black.opacity(0.4), radius: 6)
+                        .padding(20)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
         }
         .cornerRadius(16)
@@ -39,9 +53,17 @@ struct SwipeCardView: View {
                 : .zero
         )
         .gesture(isTopCard ? dragGesture : nil)
+        .onTapGesture {
+            // Only open detail when it's a stationary tap on the top card
+            // (DragGesture minimumDistance:10 ensures drags don't trigger this)
+            if isTopCard { showDetail = true }
+        }
         .onChange(of: flyOffDirection) { _, direction in
             guard let direction else { return }
             performFlyOff(to: direction)
+        }
+        .sheet(isPresented: $showDetail) {
+            PhotoDetailView(asset: photoItem.asset)
         }
     }
 
@@ -52,14 +74,11 @@ struct SwipeCardView: View {
             }
             .onEnded { value in
                 let x = value.translation.width
-                let y = value.translation.height
 
                 if x > dragThresholdX {
                     flyOffDirection = .keep
                 } else if x < -dragThresholdX {
                     flyOffDirection = .delete
-                } else if y < dragThresholdY {
-                    flyOffDirection = .favorite
                 } else {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                         viewModel.dragOffset = .zero
@@ -75,9 +94,7 @@ struct SwipeCardView: View {
             targetOffset = CGSize(width: 700, height: viewModel.dragOffset.height)
         case .delete:
             targetOffset = CGSize(width: -700, height: viewModel.dragOffset.height)
-        case .favorite:
-            targetOffset = CGSize(width: viewModel.dragOffset.width, height: -800)
-        case .undecided:
+        default:
             targetOffset = .zero
         }
 

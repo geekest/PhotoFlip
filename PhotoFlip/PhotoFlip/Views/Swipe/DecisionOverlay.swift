@@ -5,21 +5,13 @@ struct DecisionOverlay: View {
 
     private var decision: SwipeDecision? {
         let x = dragOffset.width
-        let y = dragOffset.height
-        if abs(x) > abs(y) {
-            if x > 30 { return .keep }
-            if x < -30 { return .delete }
-        } else {
-            if y < -30 { return .favorite }
-        }
+        if x > 30 { return .keep }
+        if x < -30 { return .delete }
         return nil
     }
 
     private var opacity: Double {
-        let x = dragOffset.width
-        let y = dragOffset.height
-        let magnitude = abs(x) > abs(y) ? abs(x) : abs(y)
-        return min(1.0, magnitude / 80.0)
+        min(1.0, abs(dragOffset.width) / 80.0)
     }
 
     var body: some View {
@@ -34,11 +26,7 @@ struct DecisionOverlay: View {
                     badge(text: "删除", color: .delete, rotation: 15)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         .padding(24)
-                case .favorite:
-                    badge(text: "收藏", color: .favorite, rotation: 0)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .padding(.top, 48)
-                case .undecided:
+                default:
                     EmptyView()
                 }
             }
