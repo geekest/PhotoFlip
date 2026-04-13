@@ -1,28 +1,22 @@
-//
-//  ContentView.swift
-//  PhotoFlip
-//
-//  Created by Local on 2026/4/13.
-//
-
 import SwiftUI
 
 struct ContentView: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        switch appState.screen {
-        case .permission:
+        if appState.isPermissionGranted {
+            TabView {
+                LibraryView()
+                    .tabItem { Label("图库", systemImage: "photo.stack") }
+
+                SwipeSessionView()
+                    .tabItem { Label("整理", systemImage: "hand.draw") }
+
+                SettingsView()
+                    .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
+            }
+        } else {
             PermissionView()
-        case .loading:
-            ProgressView("加载中…")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .swiping:
-            SwipeSessionView()
-        case .review:
-            ReviewView()
-        case .completion(let deleted, let kept, let duration):
-            CompletionView(deleted: deleted, kept: kept, duration: duration)
         }
     }
 }

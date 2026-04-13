@@ -1,16 +1,14 @@
 import Foundation
+import Photos
 
 @Observable
 final class AppState {
-    enum AppScreen {
-        case permission
-        case loading
-        case swiping
-        case review
-        case completion(deleted: Int, kept: Int, duration: TimeInterval)
-    }
-
-    var screen: AppScreen = .permission
+    var isPermissionGranted: Bool
     var pendingPhotos: [PhotoItem] = []
     var sessionStartTime: Date = Date()
+
+    init() {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        self.isPermissionGranted = (status == .authorized || status == .limited)
+    }
 }
