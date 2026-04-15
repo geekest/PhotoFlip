@@ -14,21 +14,25 @@ struct CardStackView: View {
     }()
 
     var body: some View {
-        ZStack {
-            ForEach(visibleOffsets.reversed(), id: \.self) { offset in
-                let photoIndex = viewModel.currentIndex + offset
-                if let photo = viewModel.photos[safe: photoIndex] {
-                    SwipeCardView(
-                        photoItem: photo,
-                        viewModel: viewModel,
-                        isTopCard: offset == 0,
-                        loader: loaders[offset]
-                    )
-                    .scaleEffect(cardScales[offset])
-                    .offset(y: cardOffsets[offset])
-                    .zIndex(Double(3 - offset))
+        GeometryReader { geo in
+            ZStack {
+                ForEach(visibleOffsets.reversed(), id: \.self) { offset in
+                    let photoIndex = viewModel.currentIndex + offset
+                    if let photo = viewModel.photos[safe: photoIndex] {
+                        SwipeCardView(
+                            photoItem: photo,
+                            viewModel: viewModel,
+                            isTopCard: offset == 0,
+                            loader: loaders[offset]
+                        )
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .scaleEffect(cardScales[offset])
+                        .offset(y: cardOffsets[offset])
+                        .zIndex(Double(3 - offset))
+                    }
                 }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
         .onChange(of: viewModel.currentIndex) { oldIndex, newIndex in
             if newIndex > oldIndex {

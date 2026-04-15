@@ -21,7 +21,7 @@ struct SettingsView: View {
                             } label: {
                                 Image(systemName: "minus.circle.fill")
                                     .font(.title2)
-                                    .foregroundStyle(batchSize <= 10 ? .secondary : .accentColor)
+                                    .foregroundStyle(batchSize <= 10 ? Color.secondary : Color.accentColor)
                             }
                             .buttonStyle(.plain)
                             .disabled(batchSize <= 10)
@@ -36,7 +36,7 @@ struct SettingsView: View {
                             } label: {
                                 Image(systemName: "plus.circle.fill")
                                     .font(.title2)
-                                    .foregroundStyle(batchSize >= 500 ? .secondary : .accentColor)
+                                    .foregroundStyle(batchSize >= 500 ? Color.secondary : Color.accentColor)
                             }
                             .buttonStyle(.plain)
                             .disabled(batchSize >= 500)

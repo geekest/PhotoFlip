@@ -32,7 +32,10 @@ struct SwipeSessionView: View {
             }
         }
         .onAppear {
-            if viewModel == nil && !appState.pendingPhotos.isEmpty {
+            guard viewModel == nil else { return }
+            if appState.pendingPhotos.isEmpty {
+                Task { await startNewRound() }
+            } else {
                 viewModel = SwipeSessionViewModel(
                     photos: appState.pendingPhotos,
                     libraryManager: libraryManager
@@ -63,6 +66,9 @@ private struct SwipeContent: View {
     @State private var isDeleting = false
     @State private var deleteError: String?
 
+    private var cardWidth: CGFloat { UIScreen.main.bounds.width - 32 }
+    private var cardHeight: CGFloat { cardWidth * 4 / 3 }
+
     var body: some View {
         VStack(spacing: 0) {
             // ── Top bar ──────────────────────────────────────────────
@@ -79,7 +85,7 @@ private struct SwipeContent: View {
                     } icon: {
                         Image(systemName: "trash")
                     }
-                    .foregroundStyle(viewModel.photosToDelete.isEmpty ? .secondary : .red)
+                    .foregroundStyle(viewModel.photosToDelete.isEmpty ? Color.secondary : Color.red)
                 }
                 .disabled(viewModel.photosToDelete.isEmpty || isDeleting)
 
@@ -95,7 +101,7 @@ private struct SwipeContent: View {
                     viewModel.undo()
                 } label: {
                     Image(systemName: "arrow.uturn.left")
-                        .foregroundStyle(viewModel.canUndo ? .primary : .secondary.opacity(0.4))
+                        .foregroundStyle(viewModel.canUndo ? Color.primary : Color.secondary.opacity(0.4))
                 }
                 .disabled(!viewModel.canUndo)
             }
@@ -114,7 +120,7 @@ private struct SwipeContent: View {
 
             // ── Card stack ───────────────────────────────────────────
             CardStackView(viewModel: viewModel)
-                .padding(.horizontal, 16)
+                .frame(width: cardWidth, height: cardHeight)
                 .padding(.vertical, 8)
         }
         .confirmationDialog(
