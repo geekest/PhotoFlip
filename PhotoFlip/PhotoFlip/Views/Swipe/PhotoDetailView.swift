@@ -37,6 +37,31 @@ struct PhotoDetailView: View {
                 }
             }
             .ignoresSafeArea(edges: .bottom)
+            .safeAreaInset(edge: .bottom) {
+                // Bottom info strip
+                HStack {
+                    if let date = asset.creationDate {
+                        Label(date.formatted(date: .abbreviated, time: .omitted),
+                              systemImage: "calendar")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.9))
+                    }
+                    Spacer()
+                    if asset.location != nil {
+                        Label("已记录位置", systemImage: "mappin")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.9))
+                    } else {
+                        Text("双击放大")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(.ultraThinMaterial)
+                .environment(\.colorScheme, .dark)
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.black.opacity(0.8), for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
@@ -74,8 +99,6 @@ struct PhotoDetailView: View {
     }
 
     private func openInPhotos() {
-        // iOS does not expose a deep-link URL for specific photos;
-        // we open Photos.app at its root.
         if let url = URL(string: "photos-redirect://") {
             UIApplication.shared.open(url)
         }

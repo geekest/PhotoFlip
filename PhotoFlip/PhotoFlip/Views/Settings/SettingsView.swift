@@ -10,8 +10,8 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                // ── Photo deletion ───────────────────────────────────
-                Section("照片删除") {
+                // ── Photo deletion ────────────────────────────────────
+                Section {
                     HStack {
                         Text("单次整理数量")
                         Spacer()
@@ -42,9 +42,13 @@ struct SettingsView: View {
                             .disabled(batchSize >= 500)
                         }
                     }
+                } header: {
+                    Text("照片删除")
+                } footer: {
+                    Text("每次滑动会话最多显示的照片张数。建议 50–150 张，避免疲劳。")
                 }
 
-                // ── About ────────────────────────────────────────────
+                // ── About ─────────────────────────────────────────────
                 Section("关于") {
                     Button {
                         if let url = URL(string: "mailto:feedback@photoflip.app") {
@@ -79,6 +83,13 @@ struct SettingsView: View {
                         Text(versionString)
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                // ── Footer ────────────────────────────────────────────
+                Section {
+                } footer: {
+                    Text("PhotoFlip · 用手势整理你的回忆")
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
             .navigationTitle("设置")

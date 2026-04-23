@@ -15,7 +15,6 @@ struct SwipeCardView: View {
 
     var body: some View {
         ZStack {
-            // Background shown while image loads
             Color(UIColor.secondarySystemBackground)
 
             if let image = loader.image {
@@ -29,24 +28,34 @@ struct SwipeCardView: View {
                 ProgressView()
             }
 
+            // Bottom gradient info strip
+            bottomInfoStrip
+                .allowsHitTesting(false)
+
             if isTopCard {
                 DecisionOverlay(dragOffset: viewModel.dragOffset)
 
-                // Heart / favorite button – bottom-right corner
+                // Heart / favorite button — circular white button with orange heart
                 Button {
                     viewModel.markFavorite(for: photoItem)
                 } label: {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 30))
-                        .foregroundStyle(.red)
-                        .shadow(color: .black.opacity(0.4), radius: 6)
-                        .padding(20)
+                    ZStack {
+                        Circle()
+                            .fill(.regularMaterial)
+                            .frame(width: 52, height: 52)
+                            .shadow(color: .black.opacity(0.22), radius: 6, y: 3)
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(Color.pfOrange)
+                    }
                 }
+                .padding(14)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
         }
-        .cornerRadius(16)
-        .shadow(radius: 8)
+        .cornerRadius(20)
+        .shadow(color: isTopCard ? .black.opacity(0.28) : .black.opacity(0.14),
+                radius: isTopCard ? 20 : 8, x: 0, y: isTopCard ? 12 : 4)
         .offset(isTopCard ? viewModel.dragOffset : .zero)
         .rotationEffect(
             isTopCard
@@ -55,8 +64,6 @@ struct SwipeCardView: View {
         )
         .gesture(isTopCard ? dragGesture : nil)
         .onTapGesture {
-            // Only open detail when it's a stationary tap on the top card
-            // (DragGesture minimumDistance:10 ensures drags don't trigger this)
             if isTopCard { showDetail = true }
         }
         .onChange(of: flyOffDirection) { _, direction in
@@ -68,6 +75,32 @@ struct SwipeCardView: View {
         }
     }
 
+    @ViewBuilder
+    private var bottomInfoStrip: some View {
+        if photoItem.asset.creationDate != nil || photoItem.asset.location != nil {
+            LinearGradient(
+                colors: [.black.opacity(0.6), .clear],
+                startPoint: .bottom,
+                endPoint: .init(x: 0.5, y: 0.65)
+            )
+            .overlay(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 3) {
+                    if let date = photoItem.asset.creationDate {
+                        Label(date.formatted(date: .abbreviated, time: .omitted),
+                              systemImage: "calendar")
+                            .font(.caption2)
+                    }
+                    if photoItem.asset.location != nil {
+                        Label("已记录位置", systemImage: "mappin")
+                            .font(.caption2)
+                    }
+                }
+                .foregroundStyle(.white)
+                .padding(14)
+            }
+        }
+    }
+
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 10)
             .onChanged { value in
@@ -75,7 +108,6 @@ struct SwipeCardView: View {
             }
             .onEnded { value in
                 let x = value.translation.width
-
                 if x > dragThresholdX {
                     flyOffDirection = .keep
                 } else if x < -dragThresholdX {
