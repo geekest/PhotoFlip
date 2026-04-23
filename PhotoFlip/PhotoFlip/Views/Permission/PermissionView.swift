@@ -87,3 +87,9 @@ struct PermissionView: View {
         }
     }
 }
+
+#Preview {
+    PermissionView()
+        .environment(AppState())
+        .environment(PhotoLibraryManager())
+}

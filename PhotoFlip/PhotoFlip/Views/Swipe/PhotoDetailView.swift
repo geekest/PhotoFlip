@@ -81,3 +81,12 @@ struct PhotoDetailView: View {
         }
     }
 }
+
+#Preview {
+    let assets = PHAsset.fetchAssets(with: .image, options: nil)
+    if let asset = assets.firstObject {
+        PhotoDetailView(asset: asset)
+    } else {
+        ContentUnavailableView("需要照片权限", systemImage: "photo")
+    }
+}

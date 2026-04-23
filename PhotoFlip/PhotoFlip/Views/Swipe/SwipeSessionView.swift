@@ -242,3 +242,20 @@ private struct CompletionContent: View {
         .frame(maxWidth: .infinity)
     }
 }
+
+#Preview("整理视图") {
+    SwipeSessionView()
+        .environment(AppState())
+        .environment(PhotoLibraryManager())
+}
+
+#Preview("完成界面") {
+    let viewModel = SwipeSessionViewModel(photos: [], libraryManager: PhotoLibraryManager())
+    CompletionContent(viewModel: viewModel, isLoading: false, onNewRound: {})
+}
+
+#Preview("计数器") {
+    let viewModel = SwipeSessionViewModel(photos: [], libraryManager: PhotoLibraryManager())
+    CounterView(viewModel: viewModel)
+        .padding()
+}

@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 
 struct CardStackView: View {
     @Bindable var viewModel: SwipeSessionViewModel
@@ -70,4 +71,14 @@ struct CardStackView: View {
             }
         }
     }
+}
+
+#Preview {
+    let assets = PHAsset.fetchAssets(with: .image, options: nil)
+    let count = min(assets.count, 3)
+    let photos = (0..<count).map { PhotoItem(asset: assets[$0]) }
+    let viewModel = SwipeSessionViewModel(photos: photos, libraryManager: PhotoLibraryManager())
+    CardStackView(viewModel: viewModel)
+        .aspectRatio(3/4, contentMode: .fit)
+        .padding()
 }

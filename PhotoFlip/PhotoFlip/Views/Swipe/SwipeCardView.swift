@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 
 struct SwipeCardView: View {
     let photoItem: PhotoItem
@@ -107,5 +108,18 @@ struct SwipeCardView: View {
             viewModel.dragOffset = .zero
             flyOffDirection = nil
         }
+    }
+}
+
+#Preview {
+    let assets = PHAsset.fetchAssets(with: .image, options: nil)
+    if let asset = assets.firstObject {
+        let photo = PhotoItem(asset: asset)
+        let viewModel = SwipeSessionViewModel(photos: [photo], libraryManager: PhotoLibraryManager())
+        SwipeCardView(photoItem: photo, viewModel: viewModel, isTopCard: true, loader: ImageLoader())
+            .aspectRatio(3/4, contentMode: .fit)
+            .padding()
+    } else {
+        ContentUnavailableView("需要照片权限", systemImage: "photo")
     }
 }

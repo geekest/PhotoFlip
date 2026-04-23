@@ -118,3 +118,9 @@ private struct LibraryPhotoCell: View {
         .onDisappear { loader.cancel() }
     }
 }
+
+#Preview {
+    LibraryView()
+        .environment(AppState())
+        .environment(PhotoLibraryManager())
+}

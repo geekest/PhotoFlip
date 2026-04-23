@@ -20,3 +20,25 @@ struct ContentView: View {
         }
     }
 }
+
+#Preview("未授权") {
+    let appState: AppState = {
+        let s = AppState()
+        s.isPermissionGranted = false
+        return s
+    }()
+    ContentView()
+        .environment(appState)
+        .environment(PhotoLibraryManager())
+}
+
+#Preview("已授权") {
+    let appState: AppState = {
+        let s = AppState()
+        s.isPermissionGranted = true
+        return s
+    }()
+    ContentView()
+        .environment(appState)
+        .environment(PhotoLibraryManager())
+}

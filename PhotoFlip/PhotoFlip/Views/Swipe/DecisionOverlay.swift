@@ -48,3 +48,27 @@ struct DecisionOverlay: View {
             .rotationEffect(.degrees(rotation))
     }
 }
+
+#Preview("保留") {
+    DecisionOverlay(dragOffset: CGSize(width: 120, height: 0))
+        .frame(width: 300, height: 400)
+        .background(Color.gray.opacity(0.2))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding()
+}
+
+#Preview("删除") {
+    DecisionOverlay(dragOffset: CGSize(width: -120, height: 0))
+        .frame(width: 300, height: 400)
+        .background(Color.gray.opacity(0.2))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding()
+}
+
+#Preview("无操作") {
+    DecisionOverlay(dragOffset: .zero)
+        .frame(width: 300, height: 400)
+        .background(Color.gray.opacity(0.2))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding()
+}
