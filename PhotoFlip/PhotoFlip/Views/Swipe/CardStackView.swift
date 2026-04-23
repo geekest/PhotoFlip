@@ -34,6 +34,7 @@ struct CardStackView: View {
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
+        .aspectRatio(3/4, contentMode: .fit)
         .onChange(of: viewModel.currentIndex) { oldIndex, newIndex in
             if newIndex > oldIndex {
                 advanceForward(to: newIndex)
