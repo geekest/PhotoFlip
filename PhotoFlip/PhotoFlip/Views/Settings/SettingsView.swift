@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage("batchSize") private var batchSize: Int = 100
+    @AppStorage("appearanceMode") private var appearanceMode: AppearanceMode = .system
 
     private var versionString: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
@@ -10,6 +11,20 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                // ── Display mode ──────────────────────────────────────
+                Section {
+                    Picker("显示模式", selection: $appearanceMode) {
+                        ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("显示")
+                } footer: {
+                    Text("选择「自动」将跟随系统的深色模式设定。")
+                }
+
                 // ── Photo deletion ────────────────────────────────────
                 Section {
                     HStack {
