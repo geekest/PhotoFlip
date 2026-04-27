@@ -1,13 +1,32 @@
 import SwiftUI
+import Photos
 
 struct SwipeSessionView: View {
     @Environment(AppState.self) private var appState
     @Environment(PhotoLibraryManager.self) private var libraryManager
 
     @AppStorage("batchSize") private var batchSize: Int = 100
+    @AppStorage("shuffleMode") private var shuffleModeRaw: String = ShuffleMode.recent.rawValue
+    @AppStorage("shuffleAnchorDate") private var shuffleAnchorTimestamp: Double = 0
 
     @State private var viewModel: SwipeSessionViewModel?
     @State private var isLoadingNextRound = false
+    @State private var showDatePicker = false
+    @State private var pendingPickerDate: Date = Date()
+    @State private var previousModeBeforePicker: ShuffleMode = .recent
+
+    private var shuffleMode: Binding<ShuffleMode> {
+        Binding(
+            get: { ShuffleMode(rawValue: shuffleModeRaw) ?? .recent },
+            set: { shuffleModeRaw = $0.rawValue }
+        )
+    }
+
+    private var anchorDate: Date? {
+        shuffleAnchorTimestamp > 0
+            ? Date(timeIntervalSince1970: shuffleAnchorTimestamp)
+            : nil
+    }
 
     var body: some View {
         Group {
@@ -15,12 +34,20 @@ struct SwipeSessionView: View {
                 if viewModel.isComplete {
                     CompletionContent(
                         viewModel: viewModel,
+                        libraryManager: libraryManager,
                         isLoading: isLoadingNextRound,
                         sessionStartTime: appState.sessionStartTime,
                         onNewRound: { Task { await startNewRound() } }
                     )
                 } else {
-                    SwipeContent(viewModel: viewModel, libraryManager: libraryManager)
+                    SwipeContent(
+                        viewModel: viewModel,
+                        libraryManager: libraryManager,
+                        shuffleMode: shuffleMode,
+                        anchorDate: anchorDate,
+                        isReloading: isLoadingNextRound,
+                        onModeSelected: handleModeSelected
+                    )
                 }
             } else {
                 ProgressView("准备中…")
@@ -31,6 +58,17 @@ struct SwipeSessionView: View {
             if !newPhotos.isEmpty && viewModel == nil {
                 viewModel = SwipeSessionViewModel(photos: newPhotos, libraryManager: libraryManager)
             }
+        }
+        .onChange(of: batchSize) { _, _ in
+            // Settings changed. Reload immediately if it's safe — i.e. the user
+            // hasn't started swiping yet. Otherwise the new size kicks in on the
+            // next "再来一轮".
+            guard let vm = viewModel,
+                  !isLoadingNextRound,
+                  vm.currentIndex == 0,
+                  !vm.isComplete
+            else { return }
+            Task { await startNewRound() }
         }
         .onAppear {
             guard viewModel == nil else { return }
@@ -43,12 +81,53 @@ struct SwipeSessionView: View {
                 )
             }
         }
+        .sheet(isPresented: $showDatePicker, onDismiss: {
+            // If the user dismissed without confirming, revert the mode change.
+            if shuffleMode.wrappedValue == .specifiedDate && anchorDate == nil {
+                shuffleMode.wrappedValue = previousModeBeforePicker
+            }
+        }) {
+            DatePickerSheet(
+                selection: $pendingPickerDate,
+                onConfirm: { confirmedDate in
+                    shuffleAnchorTimestamp = confirmedDate.timeIntervalSince1970
+                    showDatePicker = false
+                    Task { await startNewRound() }
+                },
+                onCancel: {
+                    showDatePicker = false
+                }
+            )
+        }
+    }
+
+    private func handleModeSelected(_ mode: ShuffleMode) {
+        switch mode {
+        case .specifiedDate:
+            // Always re-open the wheel so the user can change the date.
+            previousModeBeforePicker = (anchorDate != nil) ? .specifiedDate : .recent
+            pendingPickerDate = anchorDate ?? Date()
+            showDatePicker = true
+        case .recent, .random:
+            shuffleAnchorTimestamp = 0
+            Task { await startNewRound() }
+        }
     }
 
     private func startNewRound() async {
         isLoadingNextRound = true
         let limit = batchSize > 0 ? batchSize : 100
-        let assets = await libraryManager.fetchAllPhotos(limit: limit)
+        let mode = shuffleMode.wrappedValue
+        let assets: [PHAsset]
+        switch mode {
+        case .recent:
+            assets = await libraryManager.fetchAllPhotos(limit: limit)
+        case .random:
+            assets = await libraryManager.fetchRandomPhotos(limit: limit)
+        case .specifiedDate:
+            let anchor = anchorDate ?? Date()
+            assets = await libraryManager.fetchPhotos(before: anchor, limit: limit)
+        }
         let newPhotos = assets.map { PhotoItem(asset: $0) }
         appState.pendingPhotos = newPhotos
         appState.sessionStartTime = Date()
@@ -62,6 +141,10 @@ struct SwipeSessionView: View {
 private struct SwipeContent: View {
     @Bindable var viewModel: SwipeSessionViewModel
     let libraryManager: PhotoLibraryManager
+    @Binding var shuffleMode: ShuffleMode
+    let anchorDate: Date?
+    let isReloading: Bool
+    let onModeSelected: (ShuffleMode) -> Void
 
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
@@ -121,10 +204,31 @@ private struct SwipeContent: View {
                     .padding(.bottom, 4)
             }
 
+            // ── Mode selector + anchor caption ───────────────────────
+            VStack(spacing: 4) {
+                ShuffleModeSelector(selection: $shuffleMode, onSelect: onModeSelected)
+                    .padding(.horizontal, 20)
+
+                if shuffleMode == .specifiedDate, let anchor = anchorDate {
+                    Text("从 \(anchor.formatted(.dateTime.year().month().day())) 起向前 \(viewModel.photos.count) 张")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.bottom, 4)
+
             // ── Card stack ───────────────────────────────────────────
-            CardStackView(viewModel: viewModel)
-                .frame(width: cardWidth, height: cardHeight)
-                .padding(.vertical, 6)
+            ZStack {
+                CardStackView(viewModel: viewModel)
+                    .id(ObjectIdentifier(viewModel))
+                    .frame(width: cardWidth, height: cardHeight)
+                    .opacity(isReloading ? 0.3 : 1.0)
+
+                if isReloading {
+                    ProgressView()
+                }
+            }
+            .padding(.vertical, 6)
 
             // ── Action pad ───────────────────────────────────────────
             actionPad
@@ -295,13 +399,61 @@ private struct CounterView: View {
     }
 }
 
+// MARK: – Wheel date picker sheet
+
+private struct DatePickerSheet: View {
+    @Binding var selection: Date
+    let onConfirm: (Date) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                DatePicker(
+                    "选择日期",
+                    selection: $selection,
+                    in: ...Date(),
+                    displayedComponents: [.date]
+                )
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .padding()
+
+                Text("将以此日期作为起点向前回溯照片")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+                    .padding(.bottom, 12)
+            }
+            .navigationTitle("指定时间")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { onCancel() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("确定") { onConfirm(selection) }
+                        .fontWeight(.semibold)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+}
+
 // MARK: – Completion state
 
 private struct CompletionContent: View {
     let viewModel: SwipeSessionViewModel
+    let libraryManager: PhotoLibraryManager
     let isLoading: Bool
     let sessionStartTime: Date
     let onNewRound: () -> Void
+
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
 
     private var elapsedString: String {
         let elapsed = Int(max(0, Date().timeIntervalSince(sessionStartTime)))
@@ -359,13 +511,32 @@ private struct CompletionContent: View {
             VStack(spacing: 10) {
                 if !viewModel.photosToDelete.isEmpty {
                     Button {
-                        // Delete confirmation is handled in parent; just re-expose via sheet
+                        showDeleteConfirmation = true
                     } label: {
-                        Label("待删除 \(viewModel.photosToDelete.count) 张", systemImage: "trash")
-                            .frame(maxWidth: .infinity)
+                        Group {
+                            if isDeleting {
+                                ProgressView()
+                                    .tint(.red)
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                Label(
+                                    "待删除 \(viewModel.photosToDelete.count) 张，点击删除",
+                                    systemImage: "trash"
+                                )
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
                     }
                     .buttonStyle(.bordered)
                     .tint(.red)
+                    .disabled(isDeleting)
+                }
+
+                if let error = deleteError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Button {
@@ -381,12 +552,37 @@ private struct CompletionContent: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(isLoading)
+                .disabled(isLoading || isDeleting)
             }
             .padding(.horizontal)
 
             Spacer().frame(height: 20)
         }
+        .confirmationDialog(
+            "确认删除 \(viewModel.photosToDelete.count) 张照片？",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("删除", role: .destructive) {
+                Task { await performDelete() }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("此操作无法撤销")
+        }
+    }
+
+    private func performDelete() async {
+        isDeleting = true
+        deleteError = nil
+        do {
+            let toDelete = viewModel.photosToDelete
+            try await libraryManager.deleteAssets(toDelete.map { $0.asset })
+            viewModel.markActuallyDeleted(ids: Set(toDelete.map { $0.id }))
+        } catch {
+            deleteError = error.localizedDescription
+        }
+        isDeleting = false
     }
 
     private func statCell(count: Int, label: String, color: Color) -> some View {
@@ -411,9 +607,11 @@ private struct CompletionContent: View {
 }
 
 #Preview("完成界面") {
-    let viewModel = SwipeSessionViewModel(photos: [], libraryManager: PhotoLibraryManager())
+    let manager = PhotoLibraryManager()
+    let viewModel = SwipeSessionViewModel(photos: [], libraryManager: manager)
     CompletionContent(
         viewModel: viewModel,
+        libraryManager: manager,
         isLoading: false,
         sessionStartTime: Date().addingTimeInterval(-185),
         onNewRound: {}
