@@ -34,6 +34,7 @@ struct SwipeSessionView: View {
                 if viewModel.isComplete {
                     CompletionContent(
                         viewModel: viewModel,
+                        libraryManager: libraryManager,
                         isLoading: isLoadingNextRound,
                         sessionStartTime: appState.sessionStartTime,
                         onNewRound: { Task { await startNewRound() } }
@@ -434,9 +435,14 @@ private struct DatePickerSheet: View {
 
 private struct CompletionContent: View {
     let viewModel: SwipeSessionViewModel
+    let libraryManager: PhotoLibraryManager
     let isLoading: Bool
     let sessionStartTime: Date
     let onNewRound: () -> Void
+
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
 
     private var elapsedString: String {
         let elapsed = Int(max(0, Date().timeIntervalSince(sessionStartTime)))
@@ -494,13 +500,32 @@ private struct CompletionContent: View {
             VStack(spacing: 10) {
                 if !viewModel.photosToDelete.isEmpty {
                     Button {
-                        // Delete confirmation is handled in parent; just re-expose via sheet
+                        showDeleteConfirmation = true
                     } label: {
-                        Label("待删除 \(viewModel.photosToDelete.count) 张", systemImage: "trash")
-                            .frame(maxWidth: .infinity)
+                        Group {
+                            if isDeleting {
+                                ProgressView()
+                                    .tint(.red)
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                Label(
+                                    "待删除 \(viewModel.photosToDelete.count) 张，点击删除",
+                                    systemImage: "trash"
+                                )
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
                     }
                     .buttonStyle(.bordered)
                     .tint(.red)
+                    .disabled(isDeleting)
+                }
+
+                if let error = deleteError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Button {
@@ -516,12 +541,37 @@ private struct CompletionContent: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(isLoading)
+                .disabled(isLoading || isDeleting)
             }
             .padding(.horizontal)
 
             Spacer().frame(height: 20)
         }
+        .confirmationDialog(
+            "确认删除 \(viewModel.photosToDelete.count) 张照片？",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("删除", role: .destructive) {
+                Task { await performDelete() }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("此操作无法撤销")
+        }
+    }
+
+    private func performDelete() async {
+        isDeleting = true
+        deleteError = nil
+        do {
+            let toDelete = viewModel.photosToDelete
+            try await libraryManager.deleteAssets(toDelete.map { $0.asset })
+            viewModel.markActuallyDeleted(ids: Set(toDelete.map { $0.id }))
+        } catch {
+            deleteError = error.localizedDescription
+        }
+        isDeleting = false
     }
 
     private func statCell(count: Int, label: String, color: Color) -> some View {
@@ -546,9 +596,11 @@ private struct CompletionContent: View {
 }
 
 #Preview("完成界面") {
-    let viewModel = SwipeSessionViewModel(photos: [], libraryManager: PhotoLibraryManager())
+    let manager = PhotoLibraryManager()
+    let viewModel = SwipeSessionViewModel(photos: [], libraryManager: manager)
     CompletionContent(
         viewModel: viewModel,
+        libraryManager: manager,
         isLoading: false,
         sessionStartTime: Date().addingTimeInterval(-185),
         onNewRound: {}
