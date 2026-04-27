@@ -36,6 +36,66 @@ final class PhotoLibraryManager: NSObject {
         return assets
     }
 
+    /// Fetches up to `limit` photos whose creationDate is on or before `date`,
+    /// sorted by creation date descending (newest within the range first).
+    func fetchPhotos(before date: Date, limit: Int) async -> [PHAsset] {
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.predicate = NSPredicate(
+            format: "mediaType == %d AND creationDate <= %@",
+            PHAssetMediaType.image.rawValue,
+            date as NSDate
+        )
+        options.fetchLimit = limit > 0 ? limit : 0
+
+        let result = PHAsset.fetchAssets(with: .image, options: options)
+        var assets: [PHAsset] = []
+        assets.reserveCapacity(result.count)
+        result.enumerateObjects { asset, _, _ in
+            assets.append(asset)
+        }
+        return assets
+    }
+
+    /// Fetches `limit` photos chosen randomly from the entire library.
+    func fetchRandomPhotos(limit: Int) async -> [PHAsset] {
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        // No sort descriptor needed — we'll pick random indices ourselves.
+
+        let result = PHAsset.fetchAssets(with: .image, options: options)
+        let total = result.count
+        guard total > 0 else { return [] }
+
+        let want = limit > 0 ? min(limit, total) : total
+
+        var assets: [PHAsset] = []
+        assets.reserveCapacity(want)
+
+        if want == total {
+            result.enumerateObjects { asset, _, _ in assets.append(asset) }
+        } else {
+            let pickedIndexes = randomIndexes(count: want, upperBound: total)
+            result.enumerateObjects(at: pickedIndexes, options: []) { asset, _, _ in
+                assets.append(asset)
+            }
+        }
+        assets.shuffle()
+        return assets
+    }
+
+    private func randomIndexes(count: Int, upperBound: Int) -> IndexSet {
+        // Caller guarantees count < upperBound, so the rejection loop terminates quickly.
+        var picked = Set<Int>()
+        picked.reserveCapacity(count)
+        while picked.count < count {
+            picked.insert(Int.random(in: 0..<upperBound))
+        }
+        var set = IndexSet()
+        for i in picked { set.insert(i) }
+        return set
+    }
+
     func deleteAssets(_ assets: [PHAsset]) async throws {
         try await PHPhotoLibrary.shared().performChanges {
             PHAssetChangeRequest.deleteAssets(assets as NSFastEnumeration)
