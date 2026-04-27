@@ -32,7 +32,7 @@ struct ShuffleModeSelector: View {
                     .fill(Color(.systemBackground))
                     .shadow(color: .black.opacity(0.10), radius: 3, y: 1)
                     .frame(width: segmentWidth, height: height - inset * 2)
-                    .offset(x: knobX, y: inset)
+                    .offset(x: knobX)
                     .animation(isDragging ? nil : .spring(response: 0.32, dampingFraction: 0.78),
                                value: knobX)
 
