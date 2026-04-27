@@ -59,6 +59,17 @@ struct SwipeSessionView: View {
                 viewModel = SwipeSessionViewModel(photos: newPhotos, libraryManager: libraryManager)
             }
         }
+        .onChange(of: batchSize) { _, _ in
+            // Settings changed. Reload immediately if it's safe — i.e. the user
+            // hasn't started swiping yet. Otherwise the new size kicks in on the
+            // next "再来一轮".
+            guard let vm = viewModel,
+                  !isLoadingNextRound,
+                  vm.currentIndex == 0,
+                  !vm.isComplete
+            else { return }
+            Task { await startNewRound() }
+        }
         .onAppear {
             guard viewModel == nil else { return }
             if appState.pendingPhotos.isEmpty {
