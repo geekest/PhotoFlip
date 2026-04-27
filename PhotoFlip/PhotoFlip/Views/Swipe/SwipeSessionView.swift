@@ -208,6 +208,7 @@ private struct SwipeContent: View {
             // ── Card stack ───────────────────────────────────────────
             ZStack {
                 CardStackView(viewModel: viewModel)
+                    .id(ObjectIdentifier(viewModel))
                     .frame(width: cardWidth, height: cardHeight)
                     .opacity(isReloading ? 0.3 : 1.0)
 
