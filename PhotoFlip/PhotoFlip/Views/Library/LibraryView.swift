@@ -9,6 +9,8 @@ struct LibraryView: View {
     @State private var isLoading = false
     @State private var searchText = ""
     @State private var selectedAsset: PHAsset?
+    @State private var organizedCount: Int = 0
+    @State private var deletedCount: Int = 0
 
     private let columns = [
         GridItem(.flexible(), spacing: 2),
@@ -53,12 +55,35 @@ struct LibraryView: View {
                 } else {
                     ScrollView {
                         // ── Large title + search bar ───────────────────
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text("\(allAssets.count) 张照片")
                                 .font(.system(size: 34, weight: .bold))
                                 .tracking(-0.5)
                                 .padding(.horizontal, 20)
                                 .padding(.top, 4)
+
+                            // Historical stats
+                            HStack(spacing: 0) {
+                                Text("已整理 ")
+                                    .foregroundStyle(.secondary)
+                                Text("\(organizedCount)")
+                                    .foregroundStyle(Color.accentColor)
+                                    .fontWeight(.semibold)
+                                Text(" 张")
+                                    .foregroundStyle(.secondary)
+                                Text("  ·  ")
+                                    .foregroundStyle(.secondary)
+                                Text("已删除 ")
+                                    .foregroundStyle(.secondary)
+                                Text("\(deletedCount)")
+                                    .foregroundStyle(Color.pfOrange)
+                                    .fontWeight(.semibold)
+                                Text(" 张")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.subheadline)
+                            .monospacedDigit()
+                            .padding(.horizontal, 20)
 
                             // Search bar
                             HStack(spacing: 8) {
@@ -161,6 +186,8 @@ struct LibraryView: View {
     private func loadPhotos() async {
         isLoading = true
         allAssets = await libraryManager.fetchAllPhotos()
+        organizedCount = OrganizedPhotosStore.shared.count
+        deletedCount = OrganizedPhotosStore.shared.deletedCount
         isLoading = false
     }
 }

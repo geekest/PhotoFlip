@@ -92,11 +92,14 @@ final class SwipeSessionViewModel {
         }
     }
 
-    /// Persists IDs of all decided photos to OrganizedPhotosStore.
+    /// Persists kept/favorited IDs and deleted count to OrganizedPhotosStore.
     func saveOrganizedPhotoIDs() {
-        let decidedIDs = photos
-            .filter { $0.decision != .undecided }
+        let decided = photos.filter { $0.decision != .undecided }
+        let keptIDs = decided
+            .filter { $0.decision == .keep || $0.decision == .favorite }
             .map { $0.id }
-        OrganizedPhotosStore.shared.addIDs(decidedIDs)
+        let deletedCount = decided.filter { $0.decision == .delete }.count
+        OrganizedPhotosStore.shared.addIDs(keptIDs)
+        OrganizedPhotosStore.shared.addDeletedCount(deletedCount)
     }
 }
