@@ -91,4 +91,12 @@ final class SwipeSessionViewModel {
             photos[i].wasDeletedFromLibrary = true
         }
     }
+
+    /// Persists IDs of all decided photos to OrganizedPhotosStore.
+    func saveOrganizedPhotoIDs() {
+        let decidedIDs = photos
+            .filter { $0.decision != .undecided }
+            .map { $0.id }
+        OrganizedPhotosStore.shared.addIDs(decidedIDs)
+    }
 }
