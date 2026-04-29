@@ -8,6 +8,7 @@ struct PhotoDetailView: View {
     @State private var loader = ImageLoader()
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
+    @State private var locationName: String?
 
     var body: some View {
         NavigationStack {
@@ -47,11 +48,13 @@ struct PhotoDetailView: View {
                             .foregroundStyle(.white.opacity(0.9))
                     }
                     Spacer()
-                    if asset.location != nil {
-                        Label("已记录位置", systemImage: "mappin")
+                    if let name = locationName {
+                        Label(name, systemImage: "mappin")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.9))
-                    } else {
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    } else if asset.location == nil {
                         Text("双击放大")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.5))
@@ -85,6 +88,26 @@ struct PhotoDetailView: View {
             )
         }
         .onDisappear { loader.cancel() }
+        .task(id: asset.localIdentifier) {
+            await loadLocation()
+        }
+    }
+
+    private func loadLocation() async {
+        guard let location = asset.location else {
+            locationName = nil
+            return
+        }
+        let key = asset.localIdentifier
+        if let cached = LocationResolver.cached(for: key) {
+            locationName = cached
+            return
+        }
+        locationName = nil
+        let resolved = await LocationResolver.resolve(location: location, assetID: key)
+        if asset.localIdentifier == key {
+            locationName = resolved
+        }
     }
 
     private var magnificationGesture: some Gesture {
