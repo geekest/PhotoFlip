@@ -58,30 +58,46 @@ final class PhotoLibraryManager: NSObject {
     }
 
     /// Fetches `limit` photos chosen randomly from the entire library.
-    func fetchRandomPhotos(limit: Int) async -> [PHAsset] {
+    /// When `excluding` is non-empty, photos whose localIdentifier is in that set are skipped.
+    func fetchRandomPhotos(limit: Int, excluding: Set<String> = []) async -> [PHAsset] {
         let options = PHFetchOptions()
         options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
-        // No sort descriptor needed — we'll pick random indices ourselves.
 
         let result = PHAsset.fetchAssets(with: .image, options: options)
         let total = result.count
         guard total > 0 else { return [] }
 
-        let want = limit > 0 ? min(limit, total) : total
+        if excluding.isEmpty {
+            let want = limit > 0 ? min(limit, total) : total
+            var assets: [PHAsset] = []
+            assets.reserveCapacity(want)
+            if want == total {
+                result.enumerateObjects { asset, _, _ in assets.append(asset) }
+            } else {
+                let pickedIndexes = randomIndexes(count: want, upperBound: total)
+                result.enumerateObjects(at: pickedIndexes, options: []) { asset, _, _ in
+                    assets.append(asset)
+                }
+            }
+            assets.shuffle()
+            return assets
+        }
 
-        var assets: [PHAsset] = []
-        assets.reserveCapacity(want)
-
-        if want == total {
-            result.enumerateObjects { asset, _, _ in assets.append(asset) }
-        } else {
-            let pickedIndexes = randomIndexes(count: want, upperBound: total)
-            result.enumerateObjects(at: pickedIndexes, options: []) { asset, _, _ in
-                assets.append(asset)
+        // With exclusions: enumerate all assets, filter, shuffle, then limit.
+        // PHAsset objects are lightweight metadata handles so enumerating the full
+        // library is acceptable even for large collections.
+        var candidates: [PHAsset] = []
+        candidates.reserveCapacity(total)
+        result.enumerateObjects { asset, _, _ in
+            if !excluding.contains(asset.localIdentifier) {
+                candidates.append(asset)
             }
         }
-        assets.shuffle()
-        return assets
+        candidates.shuffle()
+        if limit > 0 && candidates.count > limit {
+            return Array(candidates.prefix(limit))
+        }
+        return candidates
     }
 
     private func randomIndexes(count: Int, upperBound: Int) -> IndexSet {

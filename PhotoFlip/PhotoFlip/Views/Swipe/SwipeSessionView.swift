@@ -8,9 +8,11 @@ struct SwipeSessionView: View {
     @AppStorage("batchSize") private var batchSize: Int = 100
     @AppStorage("shuffleMode") private var shuffleModeRaw: String = ShuffleMode.recent.rawValue
     @AppStorage("shuffleAnchorDate") private var shuffleAnchorTimestamp: Double = 0
+    @AppStorage("skipOrganizedPhotos") private var skipOrganizedPhotos: Bool = false
 
     @State private var viewModel: SwipeSessionViewModel?
     @State private var isLoadingNextRound = false
+    @State private var isAllOrganized = false
     @State private var showDatePicker = false
     @State private var pendingPickerDate: Date = Date()
     @State private var previousModeBeforePicker: ShuffleMode = .recent
@@ -30,7 +32,13 @@ struct SwipeSessionView: View {
 
     var body: some View {
         Group {
-            if let viewModel {
+            if isAllOrganized {
+                AllOrganizedView(onClearAndRestart: {
+                    OrganizedPhotosStore.shared.clearAll()
+                    isAllOrganized = false
+                    Task { await startNewRound() }
+                })
+            } else if let viewModel {
                 if viewModel.isComplete {
                     CompletionContent(
                         viewModel: viewModel,
@@ -115,7 +123,11 @@ struct SwipeSessionView: View {
     }
 
     private func startNewRound() async {
+        // Persist decisions from the outgoing session before creating a new one.
+        viewModel?.saveOrganizedPhotoIDs()
+
         isLoadingNextRound = true
+        isAllOrganized = false
         let limit = batchSize > 0 ? batchSize : 100
         let mode = shuffleMode.wrappedValue
         let assets: [PHAsset]
@@ -123,11 +135,19 @@ struct SwipeSessionView: View {
         case .recent:
             assets = await libraryManager.fetchAllPhotos(limit: limit)
         case .random:
-            assets = await libraryManager.fetchRandomPhotos(limit: limit)
+            let excludeIDs = skipOrganizedPhotos ? OrganizedPhotosStore.shared.loadIDs() : []
+            assets = await libraryManager.fetchRandomPhotos(limit: limit, excluding: excludeIDs)
         case .specifiedDate:
             let anchor = anchorDate ?? Date()
             assets = await libraryManager.fetchPhotos(before: anchor, limit: limit)
         }
+
+        if assets.isEmpty && mode == .random && skipOrganizedPhotos {
+            isAllOrganized = true
+            isLoadingNextRound = false
+            return
+        }
+
         let newPhotos = assets.map { PhotoItem(asset: $0) }
         appState.pendingPhotos = newPhotos
         appState.sessionStartTime = Date()
@@ -595,6 +615,56 @@ private struct CompletionContent: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: – All-organized empty state
+
+private struct AllOrganizedView: View {
+    let onClearAndRestart: () -> Void
+
+    var body: some View {
+        VStack(spacing: 28) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 96, height: 96)
+                    .shadow(color: Color.accentColor.opacity(0.35), radius: 18, y: 8)
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 46, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+
+            VStack(spacing: 8) {
+                Text("所有照片都整理过了！")
+                    .font(.title2.bold())
+                Text("随机模式下已没有未整理的照片。\n可以清除记录重新开始，或前往设置关闭此功能。")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            Spacer()
+
+            Button(action: onClearAndRestart) {
+                Text("清除记录并重新开始")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.horizontal)
+
+            Spacer().frame(height: 20)
+        }
     }
 }
 
