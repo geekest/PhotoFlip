@@ -8,6 +8,10 @@ struct PhotoDetailView: View {
     @State private var loader = ImageLoader()
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
+    @State private var locationName: String?
+    @State private var shareURL: URL?
+    @State private var isPreparingShare = false
+    @State private var shareError: String?
 
     var body: some View {
         NavigationStack {
@@ -47,11 +51,13 @@ struct PhotoDetailView: View {
                             .foregroundStyle(.white.opacity(0.9))
                     }
                     Spacer()
-                    if asset.location != nil {
-                        Label("已记录位置", systemImage: "mappin")
+                    if let name = locationName {
+                        Label(name, systemImage: "mappin")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.9))
-                    } else {
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    } else if asset.location == nil {
                         Text("双击放大")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.5))
@@ -70,8 +76,17 @@ struct PhotoDetailView: View {
                     Button("关闭") { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("去照片查看") { openInPhotos() }
-                        .font(.callout)
+                    Button {
+                        Task { await prepareShare() }
+                    } label: {
+                        if isPreparingShare {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.callout)
+                        }
+                    }
+                    .disabled(isPreparingShare)
                 }
             }
         }
@@ -85,6 +100,42 @@ struct PhotoDetailView: View {
             )
         }
         .onDisappear { loader.cancel() }
+        .task(id: asset.localIdentifier) {
+            await loadLocation()
+        }
+        .sheet(isPresented: Binding(
+            get: { shareURL != nil },
+            set: { if !$0 { cleanupShareFile() } }
+        )) {
+            if let url = shareURL {
+                ShareSheet(items: [url], onComplete: cleanupShareFile)
+            }
+        }
+        .alert("无法分享", isPresented: Binding(
+            get: { shareError != nil },
+            set: { if !$0 { shareError = nil } }
+        )) {
+            Button("好") { shareError = nil }
+        } message: {
+            Text(shareError ?? "")
+        }
+    }
+
+    private func loadLocation() async {
+        guard let location = asset.location else {
+            locationName = nil
+            return
+        }
+        let key = asset.localIdentifier
+        if let cached = LocationResolver.cached(for: key) {
+            locationName = cached
+            return
+        }
+        locationName = nil
+        let resolved = await LocationResolver.resolve(location: location, assetID: key)
+        if asset.localIdentifier == key {
+            locationName = resolved
+        }
     }
 
     private var magnificationGesture: some Gesture {
@@ -98,9 +149,70 @@ struct PhotoDetailView: View {
             }
     }
 
-    private func openInPhotos() {
-        if let url = URL(string: "photos-redirect://") {
-            UIApplication.shared.open(url)
+    private func prepareShare() async {
+        guard !isPreparingShare else { return }
+        isPreparingShare = true
+        defer { isPreparingShare = false }
+
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .highQualityFormat
+        options.isNetworkAccessAllowed = true
+        options.isSynchronous = false
+        options.version = .current
+
+        let result: (data: Data, uti: String?)? = await withCheckedContinuation { cont in
+            var resumed = false
+            PHImageManager.default().requestImageDataAndOrientation(
+                for: asset,
+                options: options
+            ) { data, uti, _, info in
+                // Opportunistic delivery may invoke the handler multiple times.
+                guard !resumed else { return }
+                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                if isDegraded { return }
+                resumed = true
+                if let data {
+                    cont.resume(returning: (data, uti))
+                } else {
+                    cont.resume(returning: nil)
+                }
+            }
+        }
+
+        guard let payload = result else {
+            shareError = "无法读取原始照片数据"
+            return
+        }
+
+        let ext = fileExtension(forUTI: payload.uti)
+        let baseName = asset.creationDate
+            .map { "PhotoFlip-\(Int($0.timeIntervalSince1970))" } ?? "PhotoFlip-\(UUID().uuidString)"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(baseName)
+            .appendingPathExtension(ext)
+        do {
+            try payload.data.write(to: url, options: .atomic)
+            shareURL = url
+        } catch {
+            shareError = error.localizedDescription
+        }
+    }
+
+    private func cleanupShareFile() {
+        if let url = shareURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+        shareURL = nil
+    }
+
+    private func fileExtension(forUTI uti: String?) -> String {
+        switch uti {
+        case "public.heic", "public.heif": return "heic"
+        case "public.png":                 return "png"
+        case "public.jpeg":                return "jpg"
+        case "com.compuserve.gif":         return "gif"
+        case "public.tiff":                return "tiff"
+        default:                            return "jpg"
         }
     }
 }

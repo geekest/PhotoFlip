@@ -9,6 +9,7 @@ struct SwipeCardView: View {
 
     @State private var flyOffDirection: SwipeDecision?
     @State private var showDetail = false
+    @State private var locationName: String?
 
     private let screenWidth = UIScreen.main.bounds.width
     private let dragThresholdX: CGFloat = 100
@@ -72,6 +73,9 @@ struct SwipeCardView: View {
             guard let direction else { return }
             performFlyOff(to: direction)
         }
+        .task(id: photoItem.id) {
+            await loadLocation()
+        }
         .sheet(isPresented: $showDetail) {
             PhotoDetailView(asset: photoItem.asset)
         }
@@ -92,14 +96,35 @@ struct SwipeCardView: View {
                               systemImage: "calendar")
                             .font(.caption2)
                     }
-                    if photoItem.asset.location != nil {
-                        Label("已记录位置", systemImage: "mappin")
+                    if let name = locationName {
+                        Label(name, systemImage: "mappin")
                             .font(.caption2)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                 }
                 .foregroundStyle(.white)
                 .padding(14)
             }
+        }
+    }
+
+    private func loadLocation() async {
+        guard let location = photoItem.asset.location else {
+            locationName = nil
+            return
+        }
+        let key = photoItem.id
+        if let cached = LocationResolver.cached(for: key) {
+            locationName = cached
+            return
+        }
+        locationName = nil
+        let resolved = await LocationResolver.resolve(location: location, assetID: key)
+        // .task(id:) already cancels stale work, but guard once more in case the
+        // view was reused with a different photo while we awaited.
+        if photoItem.id == key {
+            locationName = resolved
         }
     }
 
