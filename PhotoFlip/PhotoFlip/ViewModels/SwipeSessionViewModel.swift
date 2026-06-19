@@ -7,6 +7,9 @@ final class SwipeSessionViewModel {
     var currentIndex: Int = 0
     var dragOffset: CGSize = .zero
 
+    /// 当前整理的媒体类型，决定使用照片卡片栈还是视频卡片栈。
+    let mediaKind: MediaKind
+
     private struct UndoRecord {
         let index: Int
         let previous: SwipeDecision
@@ -41,9 +44,10 @@ final class SwipeSessionViewModel {
         })
     }
 
-    init(photos: [PhotoItem], libraryManager: PhotoLibraryManager) {
+    init(photos: [PhotoItem], libraryManager: PhotoLibraryManager, mediaKind: MediaKind = .photo) {
         self.photos = photos
         self.libraryManager = libraryManager
+        self.mediaKind = mediaKind
     }
 
     func processDecision(_ decision: SwipeDecision) {
