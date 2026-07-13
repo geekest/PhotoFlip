@@ -20,14 +20,15 @@ final class PhotoLibraryManager: NSObject {
         return status
     }
 
-    /// Fetches photos sorted by creation date descending. limit=0 means no limit.
-    func fetchAllPhotos(limit: Int = 0) async -> [PHAsset] {
+    /// Fetches assets sorted by creation date descending. limit=0 means no limit.
+    /// `mediaType` selects photos (.image, default) or videos (.video).
+    func fetchAllPhotos(limit: Int = 0, mediaType: PHAssetMediaType = .image) async -> [PHAsset] {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        options.predicate = NSPredicate(format: "mediaType == %d", mediaType.rawValue)
         options.fetchLimit = limit > 0 ? limit : 0
 
-        let result = PHAsset.fetchAssets(with: .image, options: options)
+        let result = PHAsset.fetchAssets(with: mediaType, options: options)
         var assets: [PHAsset] = []
         assets.reserveCapacity(result.count)
         result.enumerateObjects { asset, _, _ in
@@ -36,19 +37,19 @@ final class PhotoLibraryManager: NSObject {
         return assets
     }
 
-    /// Fetches up to `limit` photos whose creationDate is on or before `date`,
+    /// Fetches up to `limit` assets whose creationDate is on or before `date`,
     /// sorted by creation date descending (newest within the range first).
-    func fetchPhotos(before date: Date, limit: Int) async -> [PHAsset] {
+    func fetchPhotos(before date: Date, limit: Int, mediaType: PHAssetMediaType = .image) async -> [PHAsset] {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.predicate = NSPredicate(
             format: "mediaType == %d AND creationDate <= %@",
-            PHAssetMediaType.image.rawValue,
+            mediaType.rawValue,
             date as NSDate
         )
         options.fetchLimit = limit > 0 ? limit : 0
 
-        let result = PHAsset.fetchAssets(with: .image, options: options)
+        let result = PHAsset.fetchAssets(with: mediaType, options: options)
         var assets: [PHAsset] = []
         assets.reserveCapacity(result.count)
         result.enumerateObjects { asset, _, _ in
@@ -57,13 +58,13 @@ final class PhotoLibraryManager: NSObject {
         return assets
     }
 
-    /// Fetches `limit` photos chosen randomly from the entire library.
-    /// When `excluding` is non-empty, photos whose localIdentifier is in that set are skipped.
-    func fetchRandomPhotos(limit: Int, excluding: Set<String> = []) async -> [PHAsset] {
+    /// Fetches `limit` assets chosen randomly from the entire library.
+    /// When `excluding` is non-empty, assets whose localIdentifier is in that set are skipped.
+    func fetchRandomPhotos(limit: Int, excluding: Set<String> = [], mediaType: PHAssetMediaType = .image) async -> [PHAsset] {
         let options = PHFetchOptions()
-        options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        options.predicate = NSPredicate(format: "mediaType == %d", mediaType.rawValue)
 
-        let result = PHAsset.fetchAssets(with: .image, options: options)
+        let result = PHAsset.fetchAssets(with: mediaType, options: options)
         let total = result.count
         guard total > 0 else { return [] }
 

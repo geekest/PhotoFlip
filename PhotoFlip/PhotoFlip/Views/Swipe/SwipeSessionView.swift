@@ -16,6 +16,7 @@ struct SwipeSessionView: View {
     @State private var showDatePicker = false
     @State private var pendingPickerDate: Date = Date()
     @State private var previousModeBeforePicker: ShuffleMode = .recent
+    @State private var mediaKind: MediaKind = .photo
 
     private var shuffleMode: Binding<ShuffleMode> {
         Binding(
@@ -52,6 +53,7 @@ struct SwipeSessionView: View {
                         viewModel: viewModel,
                         libraryManager: libraryManager,
                         shuffleMode: shuffleMode,
+                        mediaKind: $mediaKind,
                         anchorDate: anchorDate,
                         isReloading: isLoadingNextRound,
                         onModeSelected: handleModeSelected
@@ -64,8 +66,16 @@ struct SwipeSessionView: View {
         }
         .onChange(of: appState.pendingPhotos) { _, newPhotos in
             if !newPhotos.isEmpty && viewModel == nil {
-                viewModel = SwipeSessionViewModel(photos: newPhotos, libraryManager: libraryManager)
+                viewModel = SwipeSessionViewModel(
+                    photos: newPhotos,
+                    libraryManager: libraryManager,
+                    mediaKind: mediaKind
+                )
             }
+        }
+        .onChange(of: mediaKind) { _, _ in
+            // 切换照片/视频时立即重新加载对应媒体。
+            Task { await startNewRound() }
         }
         .onChange(of: batchSize) { _, _ in
             // Settings changed. Reload immediately if it's safe — i.e. the user
@@ -85,7 +95,8 @@ struct SwipeSessionView: View {
             } else {
                 viewModel = SwipeSessionViewModel(
                     photos: appState.pendingPhotos,
-                    libraryManager: libraryManager
+                    libraryManager: libraryManager,
+                    mediaKind: mediaKind
                 )
             }
         }
@@ -128,18 +139,22 @@ struct SwipeSessionView: View {
 
         isLoadingNextRound = true
         isAllOrganized = false
-        let limit = batchSize > 0 ? batchSize : 100
+        let kind = mediaKind
+        let mediaType = kind.assetMediaType
+        // 视频模式单轮固定上限 10 个；照片沿用设置里的 batchSize。
+        let baseLimit = batchSize > 0 ? batchSize : 100
+        let limit = kind.batchLimit > 0 ? min(kind.batchLimit, baseLimit) : baseLimit
         let mode = shuffleMode.wrappedValue
         let assets: [PHAsset]
         switch mode {
         case .recent:
-            assets = await libraryManager.fetchAllPhotos(limit: limit)
+            assets = await libraryManager.fetchAllPhotos(limit: limit, mediaType: mediaType)
         case .random:
             let excludeIDs = skipOrganizedPhotos ? OrganizedPhotosStore.shared.loadIDs() : []
-            assets = await libraryManager.fetchRandomPhotos(limit: limit, excluding: excludeIDs)
+            assets = await libraryManager.fetchRandomPhotos(limit: limit, excluding: excludeIDs, mediaType: mediaType)
         case .specifiedDate:
             let anchor = anchorDate ?? Date()
-            assets = await libraryManager.fetchPhotos(before: anchor, limit: limit)
+            assets = await libraryManager.fetchPhotos(before: anchor, limit: limit, mediaType: mediaType)
         }
 
         if assets.isEmpty && mode == .random && skipOrganizedPhotos {
@@ -151,7 +166,7 @@ struct SwipeSessionView: View {
         let newPhotos = assets.map { PhotoItem(asset: $0) }
         appState.pendingPhotos = newPhotos
         appState.sessionStartTime = Date()
-        viewModel = SwipeSessionViewModel(photos: newPhotos, libraryManager: libraryManager)
+        viewModel = SwipeSessionViewModel(photos: newPhotos, libraryManager: libraryManager, mediaKind: kind)
         isLoadingNextRound = false
     }
 }
@@ -162,9 +177,12 @@ private struct SwipeContent: View {
     @Bindable var viewModel: SwipeSessionViewModel
     let libraryManager: PhotoLibraryManager
     @Binding var shuffleMode: ShuffleMode
+    @Binding var mediaKind: MediaKind
     let anchorDate: Date?
     let isReloading: Bool
     let onModeSelected: (ShuffleMode) -> Void
+
+    private var mediaNoun: String { viewModel.mediaKind.label }
 
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
@@ -224,6 +242,16 @@ private struct SwipeContent: View {
                     .padding(.bottom, 4)
             }
 
+            // ── Media kind switch (照片 / 视频) ──────────────────────
+            Picker("媒体类型", selection: $mediaKind) {
+                ForEach(MediaKind.allCases) { kind in
+                    Text(kind.label).tag(kind)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 6)
+
             // ── Mode selector + anchor caption ───────────────────────
             VStack(spacing: 4) {
                 ShuffleModeSelector(selection: $shuffleMode, onSelect: onModeSelected)
@@ -239,10 +267,16 @@ private struct SwipeContent: View {
 
             // ── Card stack ───────────────────────────────────────────
             ZStack {
-                CardStackView(viewModel: viewModel)
-                    .id(ObjectIdentifier(viewModel))
-                    .frame(width: cardWidth, height: cardHeight)
-                    .opacity(isReloading ? 0.3 : 1.0)
+                Group {
+                    if viewModel.mediaKind == .video {
+                        VideoCardStackView(viewModel: viewModel)
+                    } else {
+                        CardStackView(viewModel: viewModel)
+                    }
+                }
+                .id(ObjectIdentifier(viewModel))
+                .frame(width: cardWidth, height: cardHeight)
+                .opacity(isReloading ? 0.3 : 1.0)
 
                 if isReloading {
                     ProgressView()
@@ -256,7 +290,7 @@ private struct SwipeContent: View {
                 .padding(.vertical, 10)
         }
         .confirmationDialog(
-            "确认删除 \(viewModel.photosToDelete.count) 张照片？",
+            "确认删除 \(viewModel.photosToDelete.count) 个\(mediaNoun)？",
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
@@ -579,7 +613,7 @@ private struct CompletionContent: View {
             Spacer().frame(height: 20)
         }
         .confirmationDialog(
-            "确认删除 \(viewModel.photosToDelete.count) 张照片？",
+            "确认删除 \(viewModel.photosToDelete.count) 个\(viewModel.mediaKind.label)？",
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
