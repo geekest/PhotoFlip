@@ -24,7 +24,7 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                 } header: {
-                    Text("显示")
+                    Label("显示", systemImage: "circle.lefthalf.filled")
                 } footer: {
                     Text("选择「自动」将跟随系统的深色模式设定。")
                 }
@@ -62,7 +62,7 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Text("照片删除")
+                    Label("照片整理", systemImage: "rectangle.stack")
                 } footer: {
                     Text("每次滑动会话最多显示的照片张数。建议 50–150 张，避免疲劳。")
                 }
@@ -83,7 +83,7 @@ struct SettingsView: View {
                     }
                     .font(.subheadline)
                 } header: {
-                    Text("随机模式")
+                    Label("整理记录", systemImage: "checkmark.circle")
                 } footer: {
                     Text("开启后，在随机模式中已整理过的照片不会再次出现。")
                 }
@@ -99,7 +99,7 @@ struct SettingsView: View {
                 }
 
                 // ── About ─────────────────────────────────────────────
-                Section("关于") {
+                Section {
                     Button {
                         if let url = URL(string: "mailto:feedback@photoflip.app") {
                             UIApplication.shared.open(url)
@@ -133,6 +133,8 @@ struct SettingsView: View {
                         Text(versionString)
                             .foregroundStyle(.secondary)
                     }
+                } header: {
+                    Label("关于 PhotoFlip", systemImage: "info.circle")
                 }
 
                 // ── Footer ────────────────────────────────────────────
@@ -143,6 +145,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("设置")
+            .navigationBarTitleDisplayMode(.large)
         }
     }
 }

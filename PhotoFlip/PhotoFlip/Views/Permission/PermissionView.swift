@@ -11,21 +11,16 @@ struct PermissionView: View {
     @State private var isLoading = false
 
     var body: some View {
-        VStack(spacing: 0) {
+        ScrollView {
+            VStack(spacing: 0) {
             Spacer()
 
-            // Gradient app icon
+            // 使用克制的系统表面表达入口，避免自定义装饰抢过权限说明。
             ZStack {
                 RoundedRectangle(cornerRadius: 28)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.accentColor, Color.accentColor.opacity(0.72)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(Color.accentColor.gradient)
                     .frame(width: 108, height: 108)
-                    .shadow(color: Color.accentColor.opacity(0.42), radius: 20, x: 0, y: 10)
+                    .shadow(color: Color.accentColor.opacity(0.24), radius: 16, y: 8)
                 Image(systemName: "photo.stack")
                     .font(.system(size: 52, weight: .medium))
                     .foregroundStyle(.white)
@@ -35,8 +30,7 @@ struct PermissionView: View {
             // Title + description
             VStack(spacing: 12) {
                 Text("快速整理相册")
-                    .font(.system(size: 30, weight: .bold))
-                    .tracking(-0.5)
+                    .font(.largeTitle.bold())
                 Text("PhotoFlip 需要访问您的相册，帮您通过\n左右滑动快速整理和删除不需要的照片。")
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -53,13 +47,8 @@ struct PermissionView: View {
                 Divider().padding(.leading, 56)
                 gestureRow(symbol: "heart.fill", color: .pfOrange, label: "点心 — 加入收藏")
             }
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(.separator), lineWidth: 0.5)
-            )
-            .frame(maxWidth: 300)
+            .photoFlipCard(cornerRadius: PhotoFlipStyle.controlCornerRadius)
+            .frame(maxWidth: 340)
             .padding(.top, 36)
 
             Spacer()
@@ -105,8 +94,13 @@ struct PermissionView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 36)
+            .padding(.bottom, 24)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, PhotoFlipStyle.pagePadding)
+            .padding(.vertical, 20)
         }
+        .scrollIndicators(.hidden)
     }
 
     private func gestureRow(symbol: String, color: Color, label: String) -> some View {
