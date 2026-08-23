@@ -25,6 +25,8 @@ struct PhotoDetailView: View {
                             .scaledToFit()
                             .scaleEffect(scale)
                             .gesture(magnificationGesture)
+                            .accessibilityLabel(Text("照片详情"))
+                            .accessibilityHint(Text("双指捏合缩放，双击切换放大"))
                             .onTapGesture(count: 2) {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                     if scale > 1 {
@@ -73,7 +75,11 @@ struct PhotoDetailView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("关闭") { dismiss() }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Label("关闭", systemImage: "xmark")
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -82,10 +88,10 @@ struct PhotoDetailView: View {
                         if isPreparingShare {
                             ProgressView().tint(.white)
                         } else {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.callout)
+                            Label("分享", systemImage: "square.and.arrow.up")
                         }
                     }
+                    .accessibilityLabel(Text("分享照片"))
                     .disabled(isPreparingShare)
                 }
             }

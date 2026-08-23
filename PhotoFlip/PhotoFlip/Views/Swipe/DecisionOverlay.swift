@@ -19,11 +19,11 @@ struct DecisionOverlay: View {
             if let decision {
                 switch decision {
                 case .keep:
-                    badge(text: "保留", color: .keep, rotation: -14)
+                    badge(symbol: "checkmark", text: "保留", color: .keep, rotation: -14)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .padding(24)
                 case .delete:
-                    badge(text: "删除", color: .delete, rotation: 14)
+                    badge(symbol: "xmark", text: "删除", color: .delete, rotation: 14)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         .padding(24)
                 default:
@@ -35,18 +35,14 @@ struct DecisionOverlay: View {
         .animation(.easeOut(duration: 0.1), value: dragOffset)
     }
 
-    private func badge(text: String, color: Color, rotation: Double) -> some View {
-        Text(text)
-            .font(.system(size: 28, weight: .heavy))
-            .foregroundStyle(color)
+    private func badge(symbol: String, text: String, color: Color, rotation: Double) -> some View {
+        Label(text, systemImage: symbol)
+            .font(.title2.bold())
+            .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
-            .background(.regularMaterial)
+            .background(color.opacity(0.88), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(color, lineWidth: 4)
-            )
             .rotationEffect(.degrees(rotation))
     }
 }

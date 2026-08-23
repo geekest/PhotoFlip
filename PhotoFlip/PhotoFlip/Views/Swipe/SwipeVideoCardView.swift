@@ -55,9 +55,11 @@ struct SwipeVideoCardView: View {
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .accessibilityLabel(Text("收藏"))
+                .accessibilityHint(Text("将视频加入系统收藏并进入下一张"))
             }
         }
-        .cornerRadius(20)
+        .clipShape(RoundedRectangle(cornerRadius: PhotoFlipStyle.cardCornerRadius, style: .continuous))
         .shadow(color: isTopCard ? .black.opacity(0.28) : .black.opacity(0.14),
                 radius: isTopCard ? 20 : 8, x: 0, y: isTopCard ? 12 : 4)
         .offset(isTopCard ? viewModel.dragOffset : .zero)
@@ -72,6 +74,7 @@ struct SwipeVideoCardView: View {
             loader.prepareForDetail()
             showDetail = true
         }
+        .accessibilityHint(isTopCard ? Text("左右滑动选择保留或删除，点按播放详情") : Text("下一个视频"))
         .onChange(of: flyOffDirection) { _, direction in
             guard let direction else { return }
             performFlyOff(to: direction)
