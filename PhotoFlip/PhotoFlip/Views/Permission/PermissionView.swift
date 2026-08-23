@@ -45,7 +45,7 @@ struct PermissionView: View {
                 Divider().padding(.leading, 56)
                 gestureRow(symbol: "arrow.left", color: .red, label: "左滑 — 标记删除")
                 Divider().padding(.leading, 56)
-                gestureRow(symbol: "heart.fill", color: .pfOrange, label: "点心 — 加入收藏")
+                gestureRow(symbol: "heart.fill", color: .pfOrange, label: "点击心形 — 加入收藏")
             }
             .photoFlipCard(cornerRadius: PhotoFlipStyle.controlCornerRadius)
             .frame(maxWidth: 340)

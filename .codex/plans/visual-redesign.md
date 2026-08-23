@@ -97,8 +97,8 @@
 - [x] 完成执行计划
 - [x] 建立视觉系统与顶层壳层
 - [x] 完成图库、权限和设置重设计
-- [ ] 完成整理主流程与状态反馈重设计
-- [ ] 构建与人工走查
+- [x] 完成整理主流程与状态反馈重设计
+- [x] 构建与人工走查
 - [ ] 分阶段提交中文 commit
 - [ ] 创建中文 PR
 - [ ] 完成复盘
@@ -108,6 +108,9 @@
 - 发现：仓库 README 中列出 `ReviewViewModel` 等路径，但当前工作树未发现对应文件，实际逻辑主要集中在现有 Swipe 视图和 `SwipeSessionViewModel`。
 - 影响：重设计需以当前工作树为准，不能按 README 目录假设新增或移动业务层。
 - 处理方式：保持现有调用链不变，仅在视图层做视觉和交互层调整，并在最终复盘说明 README 与实际目录的差异。
+- 发现：XcodeBuildMCP 使用系统 CommandLineTools 环境时无法发现已启动的 iPhone 16e 模拟器；通过显式 `DEVELOPER_DIR` 的 `simctl` 可以完成安装、启动和截图。
+- 影响：无法使用 XcodeBuildMCP 的语义 UI 快照，但可以保留构建和系统级截图证据；真实照片整理流程仍需真机/模拟器手动验证。
+- 处理方式：使用 `/Applications/Xcode.app/Contents/Developer` 下的 `xcodebuild` 与 `simctl` 完成构建和权限首屏浅色/深色截图，未宣称完整 UI 自动化通过。
 
 ## 9. 决策记录
 
