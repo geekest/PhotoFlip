@@ -50,100 +50,89 @@ struct LibraryView: View {
         NavigationStack {
             Group {
                 if isLoading && allAssets.isEmpty {
-                    ProgressView("加载中…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ContentUnavailableView {
+                        ProgressView()
+                    } description: {
+                        Text("正在读取相册")
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
-                        // ── Large title + search bar ───────────────────
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("\(allAssets.count) 张照片")
-                                .font(.system(size: 34, weight: .bold))
-                                .tracking(-0.5)
-                                .padding(.horizontal, 20)
-                                .padding(.top, 4)
-
-                            // Historical stats
-                            HStack(spacing: 0) {
-                                Text("已整理 ")
-                                    .foregroundStyle(.secondary)
-                                Text("\(organizedCount)")
-                                    .foregroundStyle(Color.accentColor)
-                                    .fontWeight(.semibold)
-                                Text(" 张")
-                                    .foregroundStyle(.secondary)
-                                Text("  ·  ")
-                                    .foregroundStyle(.secondary)
-                                Text("已删除 ")
-                                    .foregroundStyle(.secondary)
-                                Text("\(deletedCount)")
-                                    .foregroundStyle(Color.pfOrange)
-                                    .fontWeight(.semibold)
-                                Text(" 张")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .font(.subheadline)
-                            .monospacedDigit()
-                            .padding(.horizontal, 20)
-
-                            // Search bar
-                            HStack(spacing: 8) {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundStyle(.tertiary)
-                                TextField("搜索月份（如 2024年3月）", text: $searchText)
-                                    .font(.body)
-                                if !searchText.isEmpty {
-                                    Button {
-                                        searchText = ""
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundStyle(.tertiary)
-                                    }
+                        VStack(alignment: .leading, spacing: PhotoFlipStyle.sectionSpacing) {
+                            HStack(alignment: .firstTextBaseline) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("你的相册")
+                                        .font(.title2.bold())
+                                    Text("\(allAssets.count) 张照片")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                        .monospacedDigit()
                                 }
+                                Spacer()
+                                Image(systemName: "photo.on.rectangle.angled")
+                                    .font(.title2)
+                                    .foregroundStyle(.tint)
+                                    .accessibilityHidden(true)
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(Color(.secondarySystemFill))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .padding(.horizontal, 16)
 
-                            // Pending delete banner
+                            HStack(spacing: 12) {
+                                LibraryStatCard(
+                                    value: organizedCount,
+                                    label: "已整理",
+                                    symbol: "checkmark.circle",
+                                    color: .accentColor
+                                )
+                                LibraryStatCard(
+                                    value: deletedCount,
+                                    label: "已删除",
+                                    symbol: "trash",
+                                    color: .pfOrange
+                                )
+                            }
+
                             if !pendingDeleteIDs.isEmpty {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "trash.fill")
-                                    Text("本次会话有 \(pendingDeleteIDs.count) 张待删除 · 红色标记")
+                                Label {
+                                    Text("本次会话有 \(pendingDeleteIDs.count) 张待删除照片")
                                         .font(.callout.weight(.medium))
+                                } icon: {
+                                    Image(systemName: "trash.fill")
                                 }
                                 .foregroundStyle(.red)
                                 .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
+                                .padding(.vertical, 12)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.red.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .padding(.horizontal, 16)
+                                .photoFlipCard(cornerRadius: PhotoFlipStyle.controlCornerRadius)
+                                .accessibilityHint(Text("整理页中可以确认或撤销删除标记"))
                             }
                         }
-                        .padding(.bottom, 4)
+                        .padding(.horizontal, PhotoFlipStyle.pagePadding)
+                        .padding(.top, 8)
 
-                        // ── Photo groups ───────────────────────────────
                         if photoGroups.isEmpty {
                             ContentUnavailableView(
                                 searchText.isEmpty ? "相册为空" : "没有匹配的照片",
-                                systemImage: searchText.isEmpty ? "photo.on.rectangle" : "magnifyingglass"
+                                systemImage: searchText.isEmpty ? "photo.on.rectangle" : "magnifyingglass",
+                                description: Text(searchText.isEmpty ? "允许访问相册后，照片会显示在这里。" : "试试搜索其他月份。")
                             )
-                            .padding(.top, 60)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 36)
                         } else {
                             LazyVStack(alignment: .leading, spacing: 0) {
                                 ForEach(photoGroups, id: \.title) { group in
-                                    // Month header
-                                    Text(group.title)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                        .padding(.horizontal, 20)
-                                        .padding(.top, 14)
-                                        .padding(.bottom, 8)
+                                    HStack(alignment: .firstTextBaseline) {
+                                        Text(group.title)
+                                            .font(.headline)
+                                        Spacer()
+                                        Text("\(group.assets.count) 张")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .monospacedDigit()
+                                    }
+                                    .padding(.horizontal, PhotoFlipStyle.pagePadding)
+                                    .padding(.top, 18)
+                                    .padding(.bottom, 10)
 
-                                    // Grid
-                                    LazyVGrid(columns: columns, spacing: 2) {
+                                    LazyVGrid(columns: columns, spacing: 4) {
                                         ForEach(group.assets, id: \.localIdentifier) { asset in
                                             LibraryPhotoCell(
                                                 asset: asset,
@@ -153,7 +142,7 @@ struct LibraryView: View {
                                             }
                                         }
                                     }
-                                    .padding(.horizontal, 2)
+                                    .padding(.horizontal, 8)
                                 }
                             }
                         }
@@ -161,16 +150,9 @@ struct LibraryView: View {
                     .refreshable { await loadPhotos() }
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("图库").font(.headline)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Image(systemName: "slider.horizontal.3")
-                        .foregroundStyle(Color.accentColor)
-                }
-            }
+            .navigationTitle("图库")
+            .navigationBarTitleDisplayMode(.large)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索月份")
             .sheet(isPresented: .init(
                 get: { selectedAsset != nil },
                 set: { if !$0 { selectedAsset = nil } }
@@ -212,7 +194,7 @@ private struct LibraryPhotoCell: View {
 
     @State private var loader = ImageLoader()
 
-    private let size: CGFloat = (UIScreen.main.bounds.width - 4) / 3
+    private let size: CGFloat = (UIScreen.main.bounds.width - 24) / 3
 
     var body: some View {
         ZStack {
@@ -247,8 +229,11 @@ private struct LibraryPhotoCell: View {
             }
         }
         .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+        .accessibilityLabel(Text(isPendingDelete ? "照片，待删除" : "照片"))
+        .accessibilityHint(Text("双击查看详情"))
         .onAppear {
             loader.load(
                 asset: asset,
@@ -259,6 +244,31 @@ private struct LibraryPhotoCell: View {
             )
         }
         .onDisappear { loader.cancel() }
+    }
+}
+
+private struct LibraryStatCard: View {
+    let value: Int
+    let label: String
+    let symbol: String
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(color)
+            Text("\(value)")
+                .font(.title3.bold().monospacedDigit())
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .photoFlipCard(cornerRadius: PhotoFlipStyle.controlCornerRadius)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(label) \(value) 张"))
     }
 }
 
