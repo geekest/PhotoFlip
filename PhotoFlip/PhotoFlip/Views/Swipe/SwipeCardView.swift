@@ -47,14 +47,14 @@ struct SwipeCardView: View {
                             .fill(.regularMaterial)
                             .frame(width: 52, height: 52)
                             .shadow(color: .black.opacity(0.22), radius: 6, y: 3)
-                        Image(systemName: "heart.fill")
+                        Image(systemName: photoItem.asset.isFavorite ? "heart.fill" : "heart")
                             .font(.system(size: 24))
                             .foregroundStyle(Color.pfOrange)
                     }
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .accessibilityLabel(Text("收藏"))
+                .accessibilityLabel(Text(photoItem.asset.isFavorite ? "已收藏" : "收藏"))
                 .accessibilityHint(Text("将照片加入系统收藏并进入下一张"))
             }
         }
@@ -72,6 +72,12 @@ struct SwipeCardView: View {
             if isTopCard { showDetail = true }
         }
         .accessibilityHint(isTopCard ? Text("左右滑动选择保留或删除，点按查看详情") : Text("下一张照片"))
+        .accessibilityAction(named: Text("保留")) {
+            if isTopCard { viewModel.processDecision(.keep) }
+        }
+        .accessibilityAction(named: Text("标记删除")) {
+            if isTopCard { viewModel.processDecision(.delete) }
+        }
         .onChange(of: flyOffDirection) { _, direction in
             guard let direction else { return }
             performFlyOff(to: direction)

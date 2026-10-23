@@ -171,7 +171,7 @@ struct SwipeSessionView: View {
     }
 }
 
-// MARK: – Swipe content (card stack + top bar + progress + action pad)
+// MARK: – Swipe content
 
 private struct SwipeContent: View {
     @Bindable var viewModel: SwipeSessionViewModel
@@ -193,29 +193,6 @@ private struct SwipeContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("整理照片")
-                        .font(.title2.bold())
-                    Text("左右滑动做决定，点按查看详情")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button {
-                    viewModel.undo()
-                } label: {
-                    Image(systemName: "arrow.uturn.left")
-                        .font(.body.weight(.semibold))
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(.bordered)
-                .disabled(!viewModel.canUndo)
-                .accessibilityLabel(Text("撤销上一步"))
-            }
-            .padding(.horizontal, PhotoFlipStyle.pagePadding)
-            .padding(.top, 12)
-
             HStack {
                 Button {
                     showDeleteConfirmation = true
@@ -246,20 +223,13 @@ private struct SwipeContent: View {
                     .padding(.bottom, 4)
             }
 
-            // ── Media kind switch (照片 / 视频) ──────────────────────
-            Picker("媒体类型", selection: $mediaKind) {
-                ForEach(MediaKind.allCases) { kind in
-                    Label(kind.label, systemImage: kind.systemImage).tag(kind)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, PhotoFlipStyle.pagePadding)
-            .padding(.bottom, 10)
-
             // ── Mode selector + anchor caption ───────────────────────
             VStack(spacing: 4) {
-                ShuffleModeSelector(selection: $shuffleMode, onSelect: onModeSelected)
-                    .padding(.horizontal, PhotoFlipStyle.pagePadding)
+                HStack(alignment: .top, spacing: 8) {
+                    ShuffleModeSelector(selection: $shuffleMode, onSelect: onModeSelected)
+                    mediaKindMenu
+                }
+                .padding(.horizontal, PhotoFlipStyle.pagePadding)
 
                 if shuffleMode == .specifiedDate, let anchor = anchorDate {
                     Text("从 \(anchor.formatted(.dateTime.year().month().day())) 起向前 \(viewModel.photos.count) 张")
@@ -286,12 +256,21 @@ private struct SwipeContent: View {
                     ProgressView()
                 }
             }
+            .overlay(alignment: .topLeading) {
+                Button {
+                    viewModel.undo()
+                } label: {
+                    Image(systemName: "arrow.uturn.left")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 44, height: 44)
+                        .background(.regularMaterial, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!viewModel.canUndo || isReloading)
+                .accessibilityLabel(Text("撤销上一步"))
+                .padding(14)
+            }
             .padding(.vertical, 6)
-
-            // ── Action pad ───────────────────────────────────────────
-            actionPad
-                .padding(.horizontal, PhotoFlipStyle.pagePadding)
-                .padding(.vertical, 10)
         }
         .confirmationDialog(
             "确认删除 \(viewModel.photosToDelete.count) 个\(mediaNoun)？",
@@ -305,6 +284,30 @@ private struct SwipeContent: View {
         } message: {
             Text("此操作无法撤销")
         }
+    }
+
+    private var mediaKindMenu: some View {
+        Menu {
+            ForEach(MediaKind.allCases) { kind in
+                Button {
+                    mediaKind = kind
+                } label: {
+                    if mediaKind == kind {
+                        Label(kind.label, systemImage: "checkmark")
+                    } else {
+                        Label(kind.label, systemImage: kind.systemImage)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.left.arrow.right")
+                .font(.body.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .background(.regularMaterial, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("切换媒体类型"))
+        .accessibilityValue(Text("当前\(mediaKind.label)"))
     }
 
     // ── Progress bar ─────────────────────────────────────────────────
@@ -322,43 +325,6 @@ private struct SwipeContent: View {
         .accessibilityValue(Text("\(min(viewModel.currentIndex, viewModel.photos.count)) / \(viewModel.photos.count)"))
     }
 
-    // ── Action pad buttons ────────────────────────────────────────────
-    private var actionPad: some View {
-        HStack(spacing: 22) {
-            ActionPadButton(symbol: "xmark", color: .delete, size: 64, label: "删除") {
-                buttonDecide(.delete)
-            }
-            ActionPadButton(symbol: "heart.fill", color: .pfOrange, size: 52, label: "收藏") {
-                buttonDecide(.favorite)
-            }
-            ActionPadButton(symbol: "checkmark", color: .keep, size: 64, label: "保留") {
-                buttonDecide(.keep)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .contain)
-    }
-
-    private func buttonDecide(_ decision: SwipeDecision) {
-        guard !viewModel.isComplete else { return }
-
-        if decision == .favorite {
-            if let photo = viewModel.photos[safe: viewModel.currentIndex] {
-                viewModel.markFavorite(for: photo)
-            }
-            return
-        }
-
-        let tx: CGFloat = decision == .keep ? 700 : -700
-        withAnimation(.spring(response: 0.38, dampingFraction: 0.72)) {
-            viewModel.dragOffset = CGSize(width: tx, height: 0)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
-            viewModel.processDecision(decision)
-            viewModel.dragOffset = .zero
-        }
-    }
-
     private func performDelete() async {
         isDeleting = true
         deleteError = nil
@@ -370,49 +336,6 @@ private struct SwipeContent: View {
             deleteError = error.localizedDescription
         }
         isDeleting = false
-    }
-}
-
-// MARK: – Action pad button
-
-private struct ActionPadButton: View {
-    let symbol: String
-    let color: Color
-    let size: CGFloat
-    let label: String
-    let action: () -> Void
-
-    @State private var isPressed = false
-
-    var body: some View {
-        VStack(spacing: 5) {
-            Button(action: action) {
-                ZStack {
-                    Circle()
-                        .fill(.regularMaterial)
-                        .frame(width: size, height: size)
-                        .shadow(color: color.opacity(0.20), radius: 8, y: 4)
-                        .overlay(Circle().stroke(color.opacity(0.55), lineWidth: 1.5))
-                    Image(systemName: symbol)
-                        .font(.system(size: size * 0.40, weight: .semibold))
-                        .foregroundStyle(color)
-                }
-            }
-            .buttonStyle(.plain)
-            .scaleEffect(isPressed ? 0.92 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in isPressed = true }
-                    .onEnded { _ in isPressed = false }
-            )
-            .accessibilityLabel(Text(label))
-            .accessibilityHint(Text("执行后进入下一张"))
-
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
     }
 }
 
