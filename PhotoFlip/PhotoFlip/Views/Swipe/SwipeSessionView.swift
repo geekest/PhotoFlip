@@ -193,6 +193,17 @@ private struct SwipeContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("整理照片")
+                    .font(.title2.bold())
+                Text("左右滑动做决定，点按查看详情")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, PhotoFlipStyle.pagePadding)
+            .padding(.top, 12)
+
             HStack {
                 Button {
                     showDeleteConfirmation = true
