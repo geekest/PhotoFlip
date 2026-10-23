@@ -12,17 +12,18 @@ struct ContentView: View {
         if appState.isPermissionGranted {
             TabView(selection: $selectedTab) {
                 LibraryView()
-                    .tabItem { Label("图库", systemImage: "photo.stack") }
+                    .tabItem { Label("图库", systemImage: "photo.on.rectangle.angled") }
                     .tag(AppTab.library)
 
                 SwipeSessionView()
-                    .tabItem { Label("整理", systemImage: "hand.draw") }
+                    .tabItem { Label("整理", systemImage: "rectangle.stack") }
                     .tag(AppTab.swipe)
 
                 SettingsView()
-                    .tabItem { Label("设置", systemImage: "slider.horizontal.3") }
+                    .tabItem { Label("设置", systemImage: "gearshape") }
                     .tag(AppTab.settings)
             }
+            .tint(.accentColor)
         } else {
             PermissionView()
         }

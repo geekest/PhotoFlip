@@ -171,7 +171,7 @@ struct SwipeSessionView: View {
     }
 }
 
-// MARK: – Swipe content (card stack + top bar + progress + action pad)
+// MARK: – Swipe content
 
 private struct SwipeContent: View {
     @Bindable var viewModel: SwipeSessionViewModel
@@ -193,46 +193,38 @@ private struct SwipeContent: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // ── Top bar ──────────────────────────────────────────────
-            HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("整理照片")
+                    .font(.title2.bold())
+                Text("左右滑动做决定，点按查看详情")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, PhotoFlipStyle.pagePadding)
+            .padding(.top, 12)
+
+            HStack {
                 Button {
                     showDeleteConfirmation = true
                 } label: {
-                    Label {
-                        if viewModel.photosToDelete.count > 0 {
-                            Text("\(viewModel.photosToDelete.count)")
-                                .font(.callout.bold())
-                        }
-                    } icon: {
-                        Image(systemName: "trash")
-                    }
-                    .foregroundStyle(viewModel.photosToDelete.isEmpty ? Color.secondary : Color.red)
+                    Label("待删除 \(viewModel.photosToDelete.count)", systemImage: "trash")
+                        .font(.caption.weight(.medium))
                 }
+                .buttonStyle(.bordered)
+                .tint(viewModel.photosToDelete.isEmpty ? .secondary : .red)
                 .disabled(viewModel.photosToDelete.isEmpty || isDeleting)
 
                 Spacer()
 
                 CounterView(viewModel: viewModel)
-
-                Spacer()
-
-                Button {
-                    viewModel.undo()
-                } label: {
-                    Image(systemName: "arrow.uturn.left")
-                        .foregroundStyle(viewModel.canUndo ? Color.primary : Color.secondary.opacity(0.4))
-                }
-                .disabled(!viewModel.canUndo)
             }
-            .font(.title3)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, PhotoFlipStyle.pagePadding)
             .padding(.top, 12)
-            .padding(.bottom, 4)
 
-            // ── Progress bar ─────────────────────────────────────────
             progressBar
-                .padding(.horizontal, 20)
-                .padding(.bottom, 4)
+                .padding(.horizontal, PhotoFlipStyle.pagePadding)
+                .padding(.vertical, 10)
 
             if let error = deleteError {
                 Text(error)
@@ -242,20 +234,13 @@ private struct SwipeContent: View {
                     .padding(.bottom, 4)
             }
 
-            // ── Media kind switch (照片 / 视频) ──────────────────────
-            Picker("媒体类型", selection: $mediaKind) {
-                ForEach(MediaKind.allCases) { kind in
-                    Text(kind.label).tag(kind)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 6)
-
             // ── Mode selector + anchor caption ───────────────────────
             VStack(spacing: 4) {
-                ShuffleModeSelector(selection: $shuffleMode, onSelect: onModeSelected)
-                    .padding(.horizontal, 20)
+                HStack(alignment: .top, spacing: 8) {
+                    ShuffleModeSelector(selection: $shuffleMode, onSelect: onModeSelected)
+                    mediaKindMenu
+                }
+                .padding(.horizontal, PhotoFlipStyle.pagePadding)
 
                 if shuffleMode == .specifiedDate, let anchor = anchorDate {
                     Text("从 \(anchor.formatted(.dateTime.year().month().day())) 起向前 \(viewModel.photos.count) 张")
@@ -263,7 +248,7 @@ private struct SwipeContent: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .padding(.bottom, 4)
+            .padding(.bottom, 8)
 
             // ── Card stack ───────────────────────────────────────────
             ZStack {
@@ -282,12 +267,21 @@ private struct SwipeContent: View {
                     ProgressView()
                 }
             }
+            .overlay(alignment: .topLeading) {
+                Button {
+                    viewModel.undo()
+                } label: {
+                    Image(systemName: "arrow.uturn.left")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 44, height: 44)
+                        .background(.regularMaterial, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!viewModel.canUndo || isReloading)
+                .accessibilityLabel(Text("撤销上一步"))
+                .padding(14)
+            }
             .padding(.vertical, 6)
-
-            // ── Action pad ───────────────────────────────────────────
-            actionPad
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
         }
         .confirmationDialog(
             "确认删除 \(viewModel.photosToDelete.count) 个\(mediaNoun)？",
@@ -303,73 +297,43 @@ private struct SwipeContent: View {
         }
     }
 
-    // ── Progress bar ─────────────────────────────────────────────────
-    private var progressBar: some View {
-        VStack(spacing: 4) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color(.systemFill))
-                        .frame(height: 4)
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.accentColor, .pfOrange],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(
-                            width: viewModel.photos.isEmpty ? 0 :
-                                geo.size.width * CGFloat(viewModel.currentIndex) / CGFloat(viewModel.photos.count),
-                            height: 4
-                        )
-                        .animation(.spring(response: 0.3), value: viewModel.currentIndex)
+    private var mediaKindMenu: some View {
+        Menu {
+            ForEach(MediaKind.allCases) { kind in
+                Button {
+                    mediaKind = kind
+                } label: {
+                    if mediaKind == kind {
+                        Label(kind.label, systemImage: "checkmark")
+                    } else {
+                        Label(kind.label, systemImage: kind.systemImage)
+                    }
                 }
             }
-            .frame(height: 4)
-
-            Text("\(min(viewModel.currentIndex + 1, viewModel.photos.count)) / \(viewModel.photos.count)")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .monospacedDigit()
+        } label: {
+            Image(systemName: "arrow.left.arrow.right")
+                .font(.body.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .background(.regularMaterial, in: Circle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("切换媒体类型"))
+        .accessibilityValue(Text("当前\(mediaKind.label)"))
     }
 
-    // ── Action pad buttons ────────────────────────────────────────────
-    private var actionPad: some View {
-        HStack(spacing: 22) {
-            ActionPadButton(symbol: "xmark", color: .delete, size: 64, label: "删除") {
-                buttonDecide(.delete)
-            }
-            ActionPadButton(symbol: "heart.fill", color: .pfOrange, size: 52, label: "收藏") {
-                buttonDecide(.favorite)
-            }
-            ActionPadButton(symbol: "checkmark", color: .keep, size: 64, label: "保留") {
-                buttonDecide(.keep)
-            }
+    // ── Progress bar ─────────────────────────────────────────────────
+    private var progressBar: some View {
+        HStack(spacing: 10) {
+            ProgressView(value: viewModel.photos.isEmpty ? 0 : Double(viewModel.currentIndex) / Double(viewModel.photos.count))
+                .tint(.accentColor)
+                .animation(.easeOut(duration: 0.2), value: viewModel.currentIndex)
+            Text("\(min(viewModel.currentIndex, viewModel.photos.count)) / \(viewModel.photos.count)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func buttonDecide(_ decision: SwipeDecision) {
-        guard !viewModel.isComplete else { return }
-
-        if decision == .favorite {
-            if let photo = viewModel.photos[safe: viewModel.currentIndex] {
-                viewModel.markFavorite(for: photo)
-            }
-            return
-        }
-
-        let tx: CGFloat = decision == .keep ? 700 : -700
-        withAnimation(.spring(response: 0.38, dampingFraction: 0.72)) {
-            viewModel.dragOffset = CGSize(width: tx, height: 0)
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
-            viewModel.processDecision(decision)
-            viewModel.dragOffset = .zero
-        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("整理进度"))
+        .accessibilityValue(Text("\(min(viewModel.currentIndex, viewModel.photos.count)) / \(viewModel.photos.count)"))
     }
 
     private func performDelete() async {
@@ -386,70 +350,38 @@ private struct SwipeContent: View {
     }
 }
 
-// MARK: – Action pad button
-
-private struct ActionPadButton: View {
-    let symbol: String
-    let color: Color
-    let size: CGFloat
-    let label: String
-    let action: () -> Void
-
-    @State private var isPressed = false
-
-    var body: some View {
-        VStack(spacing: 5) {
-            Button(action: action) {
-                ZStack {
-                    Circle()
-                        .fill(.white)
-                        .frame(width: size, height: size)
-                        .shadow(color: color.opacity(0.28), radius: 8, y: 4)
-                        .overlay(Circle().stroke(color.opacity(0.6), lineWidth: 1.5))
-                    Image(systemName: symbol)
-                        .font(.system(size: size * 0.40, weight: .semibold))
-                        .foregroundStyle(color)
-                }
-            }
-            .buttonStyle(.plain)
-            .scaleEffect(isPressed ? 0.92 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: isPressed)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in isPressed = true }
-                    .onEnded { _ in isPressed = false }
-            )
-
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
 // MARK: – Counter (X · Y · Z)
 
 private struct CounterView: View {
     let viewModel: SwipeSessionViewModel
 
     var body: some View {
-        HStack(spacing: 4) {
-            Text("\(viewModel.deletedCount)")
-                .foregroundStyle(.red)
-                .contentTransition(.numericText())
-            Text("·").foregroundStyle(.secondary)
-            Text("\(viewModel.keptCount)")
-                .foregroundStyle(.green)
-                .contentTransition(.numericText())
-            Text("·").foregroundStyle(.secondary)
-            Text("\(viewModel.favoritedCount)")
-                .foregroundStyle(Color.pfOrange)
-                .contentTransition(.numericText())
+        HStack(spacing: 10) {
+            counterItem(viewModel.deletedCount, label: "删除", color: .red)
+            counterItem(viewModel.keptCount, label: "保留", color: .green)
+            counterItem(viewModel.favoritedCount, label: "收藏", color: .pfOrange)
         }
-        .font(.headline.monospacedDigit())
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.quaternary, in: Capsule())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("本轮统计"))
+        .accessibilityValue(Text("删除 \(viewModel.deletedCount) 张，保留 \(viewModel.keptCount) 张，收藏 \(viewModel.favoritedCount) 张"))
         .animation(.default, value: viewModel.deletedCount)
         .animation(.default, value: viewModel.keptCount)
         .animation(.default, value: viewModel.favoritedCount)
+    }
+
+    private func counterItem(_ count: Int, label: String, color: Color) -> some View {
+        HStack(spacing: 3) {
+            Text("\(count)")
+                .font(.subheadline.bold().monospacedDigit())
+                .foregroundStyle(color)
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -517,21 +449,14 @@ private struct CompletionContent: View {
     }
 
     var body: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: PhotoFlipStyle.sectionSpacing) {
             Spacer()
 
-            // Gradient checkmark circle
             ZStack {
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.green, Color.green.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(Color.green.gradient)
                     .frame(width: 96, height: 96)
-                    .shadow(color: Color.green.opacity(0.45), radius: 18, y: 8)
+                    .shadow(color: Color.green.opacity(0.24), radius: 16, y: 8)
                 Image(systemName: "checkmark")
                     .font(.system(size: 48, weight: .bold))
                     .foregroundStyle(.white)
@@ -555,10 +480,8 @@ private struct CompletionContent: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(.separator), lineWidth: 0.5))
-            .padding(.horizontal)
+            .photoFlipCard(cornerRadius: PhotoFlipStyle.controlCornerRadius)
+            .padding(.horizontal, PhotoFlipStyle.pagePadding)
 
             Spacer()
 
@@ -608,7 +531,7 @@ private struct CompletionContent: View {
                 .controlSize(.large)
                 .disabled(isLoading || isDeleting)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, PhotoFlipStyle.pagePadding)
 
             Spacer().frame(height: 20)
         }
@@ -658,20 +581,13 @@ private struct AllOrganizedView: View {
     let onClearAndRestart: () -> Void
 
     var body: some View {
-        VStack(spacing: 28) {
+        VStack(spacing: PhotoFlipStyle.sectionSpacing) {
             Spacer()
 
             ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                Circle().fill(Color.accentColor.gradient)
                     .frame(width: 96, height: 96)
-                    .shadow(color: Color.accentColor.opacity(0.35), radius: 18, y: 8)
+                    .shadow(color: Color.accentColor.opacity(0.24), radius: 16, y: 8)
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 46, weight: .bold))
                     .foregroundStyle(.white)
@@ -690,12 +606,12 @@ private struct AllOrganizedView: View {
             Spacer()
 
             Button(action: onClearAndRestart) {
-                Text("清除记录并重新开始")
+                Label("清除记录并重新开始", systemImage: "arrow.clockwise")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .padding(.horizontal)
+            .padding(.horizontal, PhotoFlipStyle.pagePadding)
 
             Spacer().frame(height: 20)
         }

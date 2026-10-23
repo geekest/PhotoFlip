@@ -25,7 +25,11 @@ struct VideoDetailView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("关闭") { dismiss() }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Label("关闭", systemImage: "xmark")
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
@@ -41,10 +45,12 @@ struct VideoDetailView: View {
                             }
                         }
                     } label: {
-                        Text(rateLabel(selectedRate))
+                        Label(rateLabel(selectedRate), systemImage: "speedometer")
                             .font(.callout.weight(.semibold))
                             .monospacedDigit()
                     }
+                    .accessibilityLabel(Text("播放速度"))
+                    .accessibilityValue(Text(rateLabel(selectedRate)))
                 }
             }
         }
